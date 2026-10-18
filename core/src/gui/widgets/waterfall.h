@@ -1,6 +1,7 @@
 #pragma once
 #include <core.h>
 #include <vector>
+#include <cstdint>
 #include <mutex>
 #include <gui/widgets/bandplan.h>
 #include <imgui/imgui.h>
@@ -96,6 +97,18 @@ namespace ImGui {
         void draw();
         float* getFFTBuffer();
         void pushFFT();
+        void setSpectrum3D(bool enabled);
+        bool getSpectrum3D() const;
+        void clearSpectrumHistory();
+        struct SpectrumStats {
+            double frameUs = 0;
+            double meshBuildUs = 0;
+            uint64_t meshBuilds = 0;
+            int vertices = 0;
+            int indices = 0;
+            std::size_t historyRows = 0;
+        };
+        SpectrumStats getSpectrumStats() const;
 
         void updatePallette(float colors[][3], int colorCount);
         void updatePalletteFromArray(float* colors, int colorCount);
@@ -250,6 +263,11 @@ namespace ImGui {
     private:
         void drawWaterfall();
         void drawFFT();
+        void drawSpectrum3D();
+        void captureSpectrumHistory(const float* samples, int width, int64_t timeMs);
+        void spectrumPaletteChanged();
+        void recordSpectrumFrame(double microseconds);
+        void releaseSpectrumState();
         void drawVFOs();
         void drawBandPlan();
         void processInputs();
@@ -300,7 +318,7 @@ namespace ImGui {
 
 		double usableSpectrumRatio;
         double viewBandwidth;
-        double viewOffset;
+        double viewOffset = 0;
 
         double lowerFreq;
         double upperFreq;
@@ -311,7 +329,7 @@ namespace ImGui {
         int vfoRef = REF_CENTER;
 
         // Absolute values
-        double centerFreq;
+        double centerFreq = 0;
         double wholeBandwidth;
 
         // Ranges
@@ -321,7 +339,7 @@ namespace ImGui {
         float waterfallMax;
 
         //std::vector<std::vector<float>> rawFFTs;
-        int rawFFTSize;
+        int rawFFTSize = 0;
         float* rawFFTs = NULL;
         float* latestFFT = NULL;
         float* latestFFTHold = NULL;
@@ -339,8 +357,8 @@ namespace ImGui {
         int waterfallHeadSectionIndex = 0;
         int waterfallHeadSectionHeight = 0;
 
-        GLuint* waterfallTexturesIds;
-        int* waterfallTexturesStatuses;
+        GLuint* waterfallTexturesIds = nullptr;
+        int* waterfallTexturesStatuses = nullptr;
 
         bool draggingFW = false;
         int FFTAreaHeight;

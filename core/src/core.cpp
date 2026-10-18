@@ -441,7 +441,7 @@ int sdrpp_main(int argc, char* argv[]) {
     setlocale(LC_ALL, ".65001"); // Set locale to UTF-8
     setlocale(LC_NUMERIC, "C"); // Keep '.' decimal separator so std::to_string/printf produce valid JSON
 #endif
-    flog::info("SDR++Brown! v" VERSION_STR);
+    flog::info("SDR++ Beige v" VERSION_STR);
 
 #ifdef IS_MACOS_BUNDLE
     // If this is a MacOS .app, CD to the correct directory
@@ -467,6 +467,14 @@ int sdrpp_main(int argc, char* argv[]) {
         core::args.showHelp();
         return 0;
     }
+
+#ifdef IS_MACOS_BUNDLE
+    // Third-party decoders otherwise default to Brown's shared data folders.
+    // Per-process overrides keep copied Beige histories independent of Brown.
+    const auto beigeData = std::filesystem::path(core::args["root"].s());
+    setenv("ADVANCED_DX_DATA_ROOT", (beigeData / "dx-notebook").string().c_str(), 0);
+    setenv("CW_NOTEBOOK_LOG_DIR", (beigeData / "cw-notebook").string().c_str(), 0);
+#endif
 
 #ifdef BUILD_TESTS
     // Parse plugin whitelist if provided
@@ -726,6 +734,7 @@ int sdrpp_main(int argc, char* argv[]) {
     defConfig["manualOffset"] = 0.0;
     defConfig["showMenu"] = true;
     defConfig["showWaterfall"] = true;
+    defConfig["spectrum3D"] = true;
     defConfig["source"] = "";
     defConfig["decimation"] = 1;
     defConfig["iqCorrection"] = false;

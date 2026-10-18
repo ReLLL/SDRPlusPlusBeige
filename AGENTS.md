@@ -226,3 +226,13 @@ runs-on: windows-2022
 
 IMPORTANT!!! Never change layout and formatting of C/C++ code unrelated to the task you're doing. NO braces edits in unrelated code, no spaces evenly distributed in array initializations. In existing C++ code, each position matter, NEVER change unless you fix bug related to that line. NEVER add changes to source that just alter code layout!
 
+
+# SDR++ Beige
+
+- Read `beige/DEVELOPMENT.md` and `beige/VALIDATION.md` before changing the fork, renderer, packaging or profile import.
+- Mac-first personal open-source fork. Keep Brown's existing interface. Only the Yaesu-style perspective spectrum was requested; no other Yaesu features or controls.
+- 3D replaces the spectrum pane, defaults on, and switches to 2D through the toolbar. Frequency is horizontal, height is level, depth is elapsed time, newest at the front. Use the waterfall palette. No OLDER label.
+- Preserve exported Brown object sizes, field offsets and module command IDs. New renderer state stays outside WaterFall. Run the plugin ABI comparison after host changes.
+- Bound history and geometry; cache unchanged meshes. Measure CPU drawing time and UI frame rate after render changes.
+- Build/package with `bash beige/build-macos.sh`; never edit or re-sign the installed Brown application. Beige's bundle and private profile are separate.
+- Preserve imported module enabled states, frequency records and selected band plan. Isolate notebook databases, CSV paths and logs. Keep all private profiles and migration receipts out of Git.

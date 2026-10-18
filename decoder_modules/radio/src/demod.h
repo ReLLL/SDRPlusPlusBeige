@@ -22,6 +22,16 @@ enum IFNRPreset {
     IFNR_PRESET_BROADCAST
 };
 
+enum SquelchMode {
+    SQUELCH_MODE_OFF,
+    SQUELCH_MODE_POWER,
+    SQUELCH_MODE_SNR,
+    SQUELCH_MODE_CTCSS_MUTE,
+    SQUELCH_MODE_CTCSS_DECODE,
+    SQUELCH_MODE_DCS_MUTE,
+    SQUELCH_MODE_DCS_DECODE,
+};
+
 namespace demod {
     class Demodulator {
     public:
@@ -48,6 +58,8 @@ namespace demod {
         virtual bool getFMIFNRAllowed() = 0;
         virtual bool getNBAllowed() = 0;
         virtual void setFrozen(bool frozen) {};
+        virtual bool getHighPassAllowed() { return true; }
+        virtual bool getSquelchAllowed() { return true; }
         virtual dsp::stream<dsp::stereo_t>* getOutput() = 0;
     };
 }

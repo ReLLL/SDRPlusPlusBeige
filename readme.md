@@ -1,57 +1,27 @@
-# SDR++Brown (fork), is not the original bloat-free SDR software
+# SDR++ Beige
 
+An SDR++Brown fork with a fast, perspective 3D spectrum display. Frequency runs left to right, signal level controls height, and older FFT slices recede into depth. The newest spectrum stays at the front.
 
-[Changelog](changelog.md)
+- 3D replaces the upper spectrum pane and is enabled by default.
+- Click the toolbar's **3D / 2D** button to switch views. Display settings offer the same choice. Your choice persists.
+- The 3D surface uses the selected waterfall palette and its level range. The regular waterfall remains below it.
+- Fixed history storage, peak-preserving reduction, bounded geometry and a cached mesh keep rendering inexpensive.
+- Separate Beige settings and decoder histories support side-by-side installation with Brown.
 
-**Please do not report bugs in this fork to original author. Use original application, it works better.**
+This is a macOS development build. Its bundled Homebrew libraries currently require macOS 26 or newer. It is locally ad-hoc signed; public distribution has not been prepared.
 
-**Report bugs in this fork on this page, in ISSUES.** 
+## Build and validation
 
-Please see [upstream project page](https://github.com/AlexandreRouma/SDRPlusPlus) for the basic list of its features.
+Run `bash beige/build-macos.sh`. The local build needs CMake, Ninja, a C++17 compiler, GLFW, FFTW, VOLK, zstd, PortAudio, Airspy libraries, Codec2 and SoapySDR. See [development notes](beige/DEVELOPMENT.md) and [validation](beige/VALIDATION.md).
 
-Last merge: 2025-06-11
+The bundle is created under `build-beige/SDR++Beige.app`. The packaging script can carry over installed Brown hardware modules after the plugin ABI check passes. It never edits Brown's application.
 
-Please see [brown fork page](https://sdrpp-brown.san.systems) for list of fork features.
+To copy an existing installation's private settings, plugins, band plans, frequency lists and decoder histories, use `python3 beige/import_brown.py DESTINATION_PROFILE BEIGE_APP`. An existing destination is backed up first. Run the importer while Beige is closed. No user configuration, logs or recordings belong in this repository.
 
-WINDOWS INSTALL TROUBLESHOOTING: https://youtu.be/Q3CV5U-2IIU
+## Upstream and license
 
-## Thanks / Credits
+- [SDR++Brown](https://github.com/sannysanoff/SDRPlusPlusBrown), by sannysanoff and contributors.
+- [Original SDR++](https://github.com/AlexandreRouma/SDRPlusPlus), by Alexandre Rouma and contributors.
+- Beige additions by ReLLL. GPLv3; see [license](license). Existing third-party licenses and credits remain with their sources.
 
-Thanks and due respect to:
- 
-* original author, Alexandre Rouma, for his great [work](https://github.com/AlexandreRouma/SDRPlusPlus). Due credits go to all contributors in the upstream project. 
-* MSHV author, LZ2HV, for his great [work](http://lz2hv.org/mshv).
-* logmmse/python authors for their great [work](https://github.com/wilsonchingg/logmmse).
-* OMLSA authors for their great [idea](https://github.com/yuzhouhe2000/OMLSA-IMCRA) and [implementation](https://github.com/xiaochunxin/OMLSA-MCRA).
-* imgui-notify author for his great [work](https://github.com/patrickcjk/imgui-notify)
-* implot author for his great [work](https://github.com/epezent/implot/)
-* alexander-sholohov (github) for his work on soapy_sdr module.
-* Cropinghigh / Indir for his [work](github.com/cropinghigh/sdrpp-vhfvoiceradio) on extra VHF modes.
-* monolifed for his [pbkdf2 header-only implementation](https://github.com/monolifed/pbkdf2-hmac-sha256)  
-* ruse39 for his contributions on code quality
-
-## Feedback
-
-Found an issue? Fork is worse than original? File an [issue](https://github.com/sannysanoff/SDRPlusPlusBrown/issues).
-
-## Debugging reminders
-
-* to debug in windows in virtualbox env, download mesa opengl32.dll from https://downloads.fdossena.com/Projects/Mesa3D/Builds/MesaForWindows-x64-20.1.8.7z
-* make sure you put rtaudiod.dll in the build folder's root otherwise audio sink will not load.
-* use system monitor to debug missing dlls while they fail to load.
-
-## Local Android build:
-
-* put into your ~/.gradle/gradle.properties this line: sdrKitRoot=/home/user/SDRPlusPlus/android-sdr-kit/sdr-kit
-  * it can obtained + built from: https://github.com/AlexandreRouma/android-sdr-kit 
-  * docker build --platform linux/amd64 -t android-sdr-kit  .
-  * docker start android-sdr-kit    # it will exit
-  * docker cp be03210da56a:/sdr-kit .    # will create directory with built binary libs, replace be03210da56a with id obtained from 'docker ps -a'
-* use jdk11 for gradle in android studio. Android Studio -> Settings -> ... -> Gradle -> Gradle JDK . This is needed if you have various errors with java.io unaccessible fields.
-* in case of invalid keystore error (should not happen with jdk11): 
-  * you may create new keystore with current jdk version:
-    ~/soft/jdk8/bin/keytool -genkey -v -keystore debug2.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000
-  * use this filename (debug2.keystore) in app/build.gradle along with passwords in the signingConfigs -> debug section.
-
-Good luck.
-
+The display takes its frequency/level/time presentation from Yaesu's 3D spectrum concept. No other Yaesu receiver features or controls are included.

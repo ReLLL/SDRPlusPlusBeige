@@ -1,0 +1,5 @@
+add_executable(beige_history_test history_test.cpp)
+target_include_directories(beige_history_test PRIVATE "${SDRPP_CORE_ROOT}")
+target_compile_features(beige_history_test PRIVATE cxx_std_17)
+target_compile_options(beige_history_test PRIVATE $<$<CXX_COMPILER_ID:AppleClang,Clang,GNU>:-UNDEBUG>)
+add_test(NAME beige_history COMMAND beige_history_test)

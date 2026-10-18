@@ -43,7 +43,7 @@ namespace demod {
 
             // Define structure
 
-            fmdemod.init(input, getIFSampleRate(), bandwidth, true, false);
+            fmdemod.init(input, getIFSampleRate(), bandwidth, true);
             inputDcBlock.init(&fmdemod.out, 100.0f / getIFSampleRate());
             inputConv.init(&inputDcBlock.out);
             inputPacker.init(&inputConv.out, 120);

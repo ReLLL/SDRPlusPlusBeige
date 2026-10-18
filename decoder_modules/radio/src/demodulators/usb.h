@@ -86,6 +86,8 @@ namespace demod {
             demod.setAGCFrozen(frozen);
         }
 
+        bool getHighPassAllowed() { return true; }
+        bool getSquelchAllowed() { return true; }
 
     private:
         dsp::demod::SSB<dsp::stereo_t> demod;

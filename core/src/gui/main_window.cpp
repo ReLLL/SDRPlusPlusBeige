@@ -419,6 +419,13 @@ void MainWindow::drawUpperLine(ImGui::WaterfallVFO* vfo) {
 
     ImGui::SameLine();
 
+    ImGui::SetCursorPosY(origY);
+    if (ImGui::Button(gui::waterfall.getSpectrum3D() ? "3D###beige_scope" : "2D###beige_scope", ImVec2(44 * style::uiScale, 40 * style::uiScale))) {
+        displaymenu::setSpectrum3D(!gui::waterfall.getSpectrum3D());
+    }
+    if (ImGui::IsItemHovered()) { ImGui::SetTooltip("Switch 2D / 3D spectrum"); }
+    ImGui::SameLine();
+
     int snrOffset = 87.0f * style::uiScale;
     int snrWidth = std::clamp<int>(ImGui::GetWindowSize().x - ImGui::GetCursorPosX() - snrOffset, 100.0f * style::uiScale, 300.0f * style::uiScale);
     int snrPos = std::max<int>(ImGui::GetWindowSize().x - (snrWidth + snrOffset), ImGui::GetCursorPosX());
@@ -913,6 +920,7 @@ void MainWindow::draw() {
 void MainWindow::setPlayState(bool _playing) {
     if (_playing == playing) { return; }
     if (_playing) {
+        gui::waterfall.clearSpectrumHistory();
         sigpath::iqFrontEnd.flushInputBuffer();
         sigpath::sourceManager.start();
         sigpath::sourceManager.tune(gui::waterfall.getCenterFrequency());

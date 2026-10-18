@@ -98,6 +98,8 @@ namespace demod {
             demod.setAGCFrozen(frozen);
         }
 
+        bool getHighPassAllowed() { return false; }
+        bool getSquelchAllowed() { return false; }
 
     private:
         ConfigManager* _config = NULL;

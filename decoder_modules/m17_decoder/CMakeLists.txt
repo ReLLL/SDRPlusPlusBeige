@@ -26,6 +26,20 @@ else ()
 
     pkg_check_modules(LIBCODEC2 REQUIRED codec2)
 
+    # Some macOS Codec2 bottles omit this public header. Generate it locally
+    # from the detected library version; never patch the global installation.
+    if(APPLE)
+        find_file(CODEC2_VERSION_HEADER codec2/version.h PATHS ${LIBCODEC2_INCLUDE_DIRS} NO_DEFAULT_PATH)
+        if(NOT CODEC2_VERSION_HEADER)
+            string(REPLACE "." ";" CODEC2_VERSION_PARTS "${LIBCODEC2_VERSION}")
+            list(GET CODEC2_VERSION_PARTS 0 CODEC2_MAJOR)
+            list(GET CODEC2_VERSION_PARTS 1 CODEC2_MINOR)
+            configure_file("${CMAKE_SOURCE_DIR}/beige/cmake/codec2-version.h.in"
+                "${CMAKE_CURRENT_BINARY_DIR}/compat/codec2/version.h" @ONLY)
+            target_include_directories(m17_decoder PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/compat")
+        endif()
+    endif()
+
     target_include_directories(m17_decoder PRIVATE ${LIBCODEC2_INCLUDE_DIRS})
     target_include_directories(m17_decoder PRIVATE "/usr/include/codec2")
     target_link_directories(m17_decoder PRIVATE ${LIBCODEC2_LIBRARY_DIRS})

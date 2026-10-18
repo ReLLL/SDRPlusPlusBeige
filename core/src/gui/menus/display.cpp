@@ -10,6 +10,7 @@
 #include <gui/style.h>
 #include <utils/optionlist.h>
 #include <algorithm>
+#include <http_debug_server.h>
 
 namespace displaymenu {
     bool showWaterfall;
@@ -103,6 +104,21 @@ namespace displaymenu {
     }
 
     void init() {
+        gui::waterfall.setSpectrum3D(core::configManager.conf.value("spectrum3D", true));
+        httpdebug::procfs::registerEndpoint("/display/spectrum3d", []() {
+            return gui::waterfall.getSpectrum3D() ? "true" : "false";
+        }, [](const std::string& value) {
+            if (value == "true" || value == "false") { setSpectrum3D(value == "true"); }
+        }, httpdebug::procfs::Type::Bool);
+        httpdebug::procfs::registerEndpoint("/display/spectrum-stats", []() {
+            const auto stats = gui::waterfall.getSpectrumStats();
+            json value = {{"mode", gui::waterfall.getSpectrum3D() ? "3d" : "2d"},
+                {"frame_us", stats.frameUs}, {"mesh_build_us", stats.meshBuildUs},
+                {"mesh_builds", stats.meshBuilds}, {"vertices", stats.vertices},
+                {"indices", stats.indices}, {"history_rows", stats.historyRows}};
+            value["ui_fps"] = ImGui::GetIO().Framerate;
+            return value.dump();
+        }, nullptr, httpdebug::procfs::Type::String);
         if (core::configManager.conf.contains("showFFT")) {
             showFFT = core::configManager.conf["showFFT"];
         }
@@ -229,8 +245,18 @@ namespace displaymenu {
     }
 
 
+    void setSpectrum3D(bool enabled) {
+        gui::waterfall.setSpectrum3D(enabled);
+        core::configManager.acquire();
+        core::configManager.conf["spectrum3D"] = enabled;
+        core::configManager.release(true);
+    }
+
     void draw(void* ctx) {
         float menuWidth = ImGui::GetContentRegionAvail().x;
+        if (ImGui::RadioButton("3D spectrum##beige", gui::waterfall.getSpectrum3D())) { setSpectrum3D(true); }
+        ImGui::SameLine();
+        if (ImGui::RadioButton("2D spectrum##beige", !gui::waterfall.getSpectrum3D())) { setSpectrum3D(false); }
         if (ImGui::Checkbox("Small screen / thick fingers##_sdrpp", &phoneLayout)) {
             core::configManager.acquire();
             core::configManager.conf["smallScreen"] = phoneLayout;

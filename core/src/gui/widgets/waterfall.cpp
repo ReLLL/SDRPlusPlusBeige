@@ -15,6 +15,7 @@
 #include <ctm.h>
 #include "utils/strings.h"
 #include <gui/menus/display.h>
+#include <chrono>
 
 #define MEASURE_LOCK_GUARD(mtx)                                       \
     auto t0 = currentTimeMillis();                                    \
@@ -194,6 +195,7 @@ namespace ImGui {
     }
 
     void WaterFall::drawFFT() {
+        const auto frameStart = std::chrono::steady_clock::now();
 
         // Calculate scaling factor
         float startLine = floorf(fftMax / vRange) * vRange;
@@ -207,8 +209,10 @@ namespace ImGui {
         ImU32 text = ImGui::GetColorU32(ImGuiCol_Text);
         float textVOffset = 10.0f * style::uiScale;
 
+        if (getSpectrum3D()) { drawSpectrum3D(); }
+
         // Vertical scale
-        for (float line = startLine; line > fftMin; line -= vRange) {
+        for (float line = startLine; !getSpectrum3D() && line > fftMin; line -= vRange) {
             float yPos = fftAreaMax.y - ((line - fftMin) * scaleFactor);
             window->DrawList->AddLine(ImVec2(fftAreaMin.x, roundf(yPos)),
                                       ImVec2(fftAreaMax.x, roundf(yPos)),
@@ -225,9 +229,9 @@ namespace ImGui {
             float scaleVOfsset = 7 * style::uiScale;
             for (double freq = startFreq; freq < upperFreq; freq += range) {
                 double xPos = fftAreaMin.x + ((freq - lowerFreq) * horizScale);
-                window->DrawList->AddLine(ImVec2(roundf(xPos), fftAreaMin.y + 1),
+                if (!getSpectrum3D()) { window->DrawList->AddLine(ImVec2(roundf(xPos), fftAreaMin.y + 1),
                                           ImVec2(roundf(xPos), fftAreaMax.y),
-                                          IM_COL32(50, 50, 50, 255), style::uiScale);
+                                          IM_COL32(50, 50, 50, 255), style::uiScale); }
                 window->DrawList->AddLine(ImVec2(roundf(xPos), fftAreaMax.y),
                                           ImVec2(roundf(xPos), fftAreaMax.y + scaleVOfsset),
                                           text, style::uiScale);
@@ -238,7 +242,7 @@ namespace ImGui {
         }
 
         // Data
-        if (displaymenu::showFFT) {
+        if (displaymenu::showFFT && !getSpectrum3D()) {
             if (latestFFT != NULL && fftLines != 0) {
                 std::vector<ImVec2> traces(dataWidth);
                 //                std::vector<ImVec2> shadows(dataWidth);
@@ -286,9 +290,9 @@ namespace ImGui {
                                   ImVec2(fftAreaMax.x, fftAreaMax.y),
                                   text, style::uiScale);
         // Y Axis
-        window->DrawList->AddLine(ImVec2(fftAreaMin.x, fftAreaMin.y),
+        if (!getSpectrum3D()) { window->DrawList->AddLine(ImVec2(fftAreaMin.x, fftAreaMin.y),
                                   ImVec2(fftAreaMin.x, fftAreaMax.y - 1),
-                                  text, style::uiScale);
+                                  text, style::uiScale); }
 
         // Draw center frequency indicator
         double centerFreqPos = fftAreaMin.x + ((centerFreq - lowerFreq) * horizScale);
@@ -298,6 +302,7 @@ namespace ImGui {
             ImVec2 markerMax(centerFreqPos + markerSize, fftAreaMax.y + markerSize);
             window->DrawList->AddRectFilled(markerMin, markerMax, IM_COL32(255, 255, 255, 255));
         }
+        recordSpectrumFrame(std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - frameStart).count());
     }
 
     void WaterFall::drawWaterfall() {
@@ -1059,6 +1064,8 @@ namespace ImGui {
         }
         latestFFT = new float[dataWidth];
 
+        clearSpectrumHistory();
+
         // Reallocate hold FFT
         if (latestFFTHold != NULL) {
             delete[] latestFFTHold;
@@ -1181,7 +1188,8 @@ namespace ImGui {
 
             // Format the local time string using strftime
             strftime(time_str, sizeof(time_str), "  %Y-%m-%d %H:%M:%S", local_time);
-            window->DrawList->AddText(ImVec2(fftAreaMin.x, fftAreaMin.y), ImGui::GetColorU32(ImGuiCol_TextDisabled), time_str);
+            const float clockX = getSpectrum3D() ? fftAreaMax.x - ImGui::CalcTextSize(time_str).x : fftAreaMin.x;
+            window->DrawList->AddText(ImVec2(clockX, fftAreaMin.y), ImGui::GetColorU32(ImGuiCol_TextDisabled), time_str);
         }
     }
 
@@ -1272,6 +1280,9 @@ namespace ImGui {
             }
         }
 
+        const auto spectrumTime = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count();
+        captureSpectrumHistory(latestFFT, dataWidth, spectrumTime);
         buf_mtx.unlock();
     }
 
@@ -1281,6 +1292,7 @@ namespace ImGui {
 
     void WaterFall::updatePallette(float colors[][3], int colorCount) {
         MEASURE_LOCK_GUARD(buf_mtx);
+        spectrumPaletteChanged();
         for (int i = 0; i < WATERFALL_RESOLUTION; i++) {
             int lowerId = floorf(((float)i / (float)WATERFALL_RESOLUTION) * colorCount);
             int upperId = ceilf(((float)i / (float)WATERFALL_RESOLUTION) * colorCount);
@@ -1297,6 +1309,7 @@ namespace ImGui {
 
     void WaterFall::updatePalletteFromArray(float* colors, int colorCount) {
         MEASURE_LOCK_GUARD(buf_mtx);
+        spectrumPaletteChanged();
         for (int i = 0; i < WATERFALL_RESOLUTION; i++) {
             int lowerId = floorf(((float)i / (float)WATERFALL_RESOLUTION) * colorCount);
             int upperId = ceilf(((float)i / (float)WATERFALL_RESOLUTION) * colorCount);
@@ -1350,6 +1363,8 @@ namespace ImGui {
     }
 
     void WaterFall::setCenterFrequency(double freq) {
+        MEASURE_LOCK_GUARD(buf_mtx);
+        if (freq != centerFreq) { clearSpectrumHistory(); }
         centerFreq = freq;
         lowerFreq = (centerFreq + viewOffset) - (viewBandwidth / 2.0);
         upperFreq = (centerFreq + viewOffset) + (viewBandwidth / 2.0);
@@ -1402,6 +1417,7 @@ namespace ImGui {
             }
         }
         viewBandwidth = bandWidth;
+        clearSpectrumHistory();
         lowerFreq = (centerFreq + viewOffset) - (viewBandwidth / 2.0);
         upperFreq = (centerFreq + viewOffset) + (viewBandwidth / 2.0);
         range = findBestRange(bandWidth, maxHSteps);
@@ -1425,6 +1441,7 @@ namespace ImGui {
             offset = (wholeBandwidth / 2.0) - (viewBandwidth / 2.0);
         }
         viewOffset = offset;
+        clearSpectrumHistory();
         lowerFreq = (centerFreq + viewOffset) - (viewBandwidth / 2.0);
         upperFreq = (centerFreq + viewOffset) + (viewBandwidth / 2.0);
         if (_fullUpdate) { updateWaterfallFb(); };
@@ -1797,7 +1814,10 @@ namespace ImGui {
     }
 
     WaterFall::~WaterFall() {
-        glDeleteTextures(WATERFALL_NUMBER_OF_SECTIONS, waterfallTexturesIds);
+        releaseSpectrumState();
+        if (waterfallTexturesIds) { glDeleteTextures(WATERFALL_NUMBER_OF_SECTIONS, waterfallTexturesIds); }
+        delete[] waterfallTexturesIds;
+        delete[] waterfallTexturesStatuses;
         if (rawFFTs) {
             free(rawFFTs);
         }
