@@ -31,3 +31,13 @@ All 472 General bookmarks were returned by the live Frequency Manager. Frequency
 After preserving the host ABI, a second synthetic IQ comparison measured 2D mean 0.034 ms and 3D mean 0.131 ms; 3D median 0.038 ms, 95th percentile 0.393 ms. Median UI frame rates were about 93 and 95 respectively in this run. This is a local CPU drawing measurement with synthetic IQ, not a general GPU or RF performance guarantee.
 
 The installed 1.3.3 build reopened the QA profile with its saved 2D setting. The imported profile opened in 3D, loaded all five custom plugins, returned 472 bookmarks and reported the Beige DX CSV path with no notebook error. No live RF transmission or reception test was performed.
+
+## Depth motion and detail correction
+
+The 1.3.3 reproducer held retained-row depth unchanged between FFTs, then jumped 50 ms on the next FFT. Its 192-column front spaced samples about 20 pixels apart across a 3,840-pixel pane. Subsampling 64 history rows to 48 also changed selected rows while filling the history.
+
+The correction uses display-time projection, fixed capture timestamps, every retained row and width-dependent frequency detail. Regression tests cover movement between FFTs, continuous position through a ring rollover, a fixed live front, narrow-peak separation, joined frequency grids and the complete 16-bit mesh budget. The history test measured about 9.3 microseconds per 8,192-bin update, using 1,049,120 bytes of fixed history storage.
+
+Synthetic IQ measurements during development: 1,280-pixel window mean spectrum CPU drawing time 0.394 ms, 95th percentile 1.097 ms, median UI rate 74.6 fps. The preceding build measured 0.145 ms mean and 72.9 fps in that session. A 1,512-pixel window measured 0.598 ms mean, 2.018 ms at the 95th percentile and 99.9 fps. Different display refresh rates prevent comparing those two window sizes by frame rate. These timings exclude GPU execution. An eight-second Time Profiler capture targeted the exact QA process and confirmed spectrum drawing frames; only environment-free sample exports are retained.
+
+The QA profile's VFO must remain inside the synthetic recording bandwidth. A stale near-edge VFO offset triggered the existing signal-info bounds bug in both the old and revised builds; resetting that isolated profile's VFO to the center removed the unrelated failure.

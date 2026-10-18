@@ -12,7 +12,7 @@ namespace beige {
 // Access under WaterFall::buf_mtx. Fixed storage keeps FFT ingestion allocation-free.
 class SpectrumHistory {
 public:
-    static constexpr std::size_t bins = 192;
+    static constexpr std::size_t bins = 4096;
     static constexpr std::size_t capacity = 64;
     static constexpr int64_t intervalMs = 100;
     static constexpr int64_t durationMs = (capacity - 1) * intervalMs;
@@ -27,6 +27,8 @@ public:
 
     void push(const float* samples, std::size_t width, int64_t now) {
         if (!samples || width == 0) { return; }
+        bool archive = false;
+        const auto previous = head_;
         if (count_ == 0 || now < times_[head_] || now - times_[head_] > durationMs) {
             clear();
         }
@@ -35,6 +37,10 @@ public:
             bucketStarted_ = now;
         }
         else if (now - bucketStarted_ >= intervalMs) {
+            // A new frozen slice starts at the front plane, rather than jumping
+            // immediately to the previous FFT's age when the ring advances.
+            times_[head_] = now;
+            archive = true;
             head_ = (head_ + 1) % capacity;
             count_ = (std::min)(count_ + 1, capacity);
             bucketStarted_ = now;
@@ -51,12 +57,18 @@ public:
             }
             rows_[head_][bin] = peak;
         }
+        if (archive) { rows_[previous] = rows_[head_]; }
     }
 
     std::size_t size() const { return count_; }
     uint64_t revision() const { return revision_; }
     const Row& row(std::size_t age) const { return rows_[index(age)]; }
     int64_t ageMs(std::size_t age) const { return times_[head_] - times_[index(age)]; }
+    int64_t latestTime() const { return count_ ? times_[head_] : 0; }
+    double depthAt(std::size_t age, double displayTime) const {
+        if (age == 0) { return 0; }
+        return (std::max)(0.0, displayTime - times_[index(age)]) / durationMs;
+    }
 
 private:
     std::size_t index(std::size_t age) const { return (head_ + capacity - age) % capacity; }

@@ -22,9 +22,11 @@ Fetch `brown/master` and `upstream/master`, inspect their changes, merge deliber
 
 ## Renderer
 
-`spectrum_history.h` holds 64 slices of 192 peak-preserving bins. Slice spacing is at least 100 ms, giving up to 6.3 seconds of history. The front slice refreshes on every FFT. Time uses a monotonic clock. Retuning, span changes, resizing, source start and long gaps clear stale history.
+`spectrum_history.h` holds 64 slices of 4,096 peak-preserving bins, about 1 MiB of fixed storage. Slice spacing is at least 100 ms, giving up to 6.3 seconds of history. The front slice refreshes on every FFT. A frozen slice enters at depth zero when captured. Its timestamp then stays fixed. Retuning, span changes, resizing, source start and long gaps clear stale history.
 
-`spectrum_3d.cpp` projects frequency, age and level into a colored surface. At most 48 time rows are drawn. Surface strips are submitted in batches from back to front. The mesh rebuilds only when FFT history, dimensions, palette or levels change. Cached vertices and indices are copied in one submission. The FFT path allocates no history buffers.
+`spectrum_3d.cpp` draws every retained time slice. Front resolution follows the pane width up to 4,096 intervals, then decreases with distance to 2,048, 1,024 and 512. Adjacent strips share vertices and join grids without cracks. The complete cached mesh stays below the 16-bit index limit, including its front face and outline. The FFT path allocates no history buffers.
+
+Topology and colors rebuild only when FFT history, dimensions, palette or levels change. Cached vertex positions are reprojected using monotonic display time on every UI frame. FFT arrival never controls Z movement. Stop freezes the last displayed time; the oldest surface tapers to the floor before retirement. Do not subsample history row indices or add index-based ridge lines: both caused visible jumps as history advanced.
 
 New state lives outside the exported WaterFall object, preserving its size and member offsets. This matters because Brown plugins read public waterfall fields. `check_plugin_abi.py` compares sizes and offsets against the installed Brown reference. It does not establish compatibility with every future plugin or hardware API.
 

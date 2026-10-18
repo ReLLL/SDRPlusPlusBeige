@@ -3,6 +3,7 @@
 #endif
 #include <gui/widgets/waterfall.h>
 #include <gui/widgets/spectrum_history.h>
+#include <gui/widgets/spectrum_mesh.h>
 #include <gui/gui.h>
 #include <gui/menus/display.h>
 #include <gui/style.h>
@@ -13,6 +14,7 @@
 #include <chrono>
 #include <memory>
 #include <map>
+#include <vector>
 
 namespace ImGui {
 
@@ -20,13 +22,16 @@ namespace {
 // Keep new state outside the exported WaterFall object. Brown plugins retain
 // the exact class size and member offsets they were compiled against.
 struct SpectrumState {
+    struct Position { float frequency, depth, level, offsetY; bool travels; };
     bool enabled = false;
     beige::SpectrumHistory history;
     std::unique_ptr<ImDrawList> mesh;
+    std::vector<Position> positions;
     std::array<float, 14> params{};
     uint64_t meshRevision = UINT64_MAX;
     uint64_t paletteRevision = 0;
     uint64_t meshPaletteRevision = UINT64_MAX;
+    double displayTime = 0;
     WaterFall::SpectrumStats stats;
 };
 
@@ -122,55 +127,72 @@ void WaterFall::drawSpectrum3D() {
             draw->AddLine(project(0, depth, 0), project(1, depth, 0), grid);
         }
 
-        // Painter's order: oldest strips first, newest strips last. Each vertex's
-        // color comes from the same dB-to-palette mapping as the 2D waterfall.
+        // Keep all time slices. Changing a subsampled row selection made ridges
+        // jump as history filled. Share row vertices to afford a detailed front.
         if (displaymenu::showFFT && spectrumHistory.size() > 0) {
-            constexpr std::size_t maxDrawRows = 48;
-            const std::size_t count = (std::min)(spectrumHistory.size(), maxDrawRows);
-            auto rowIndex = [&](std::size_t row) {
-                return count > 1 ? row * (spectrumHistory.size() - 1) / (count - 1) : std::size_t{0};
-            };
+            const std::size_t count = spectrumHistory.size();
             auto depthAt = [&](std::size_t age) {
-                return std::clamp((float)spectrumHistory.ageMs(age) / beige::SpectrumHistory::durationMs, 0.0f, 1.0f);
+                return (float)spectrumHistory.depthAt(age, spectrumHistory.latestTime());
             };
             const ImVec2 uv = GetFontTexUvWhitePixel();
-            for (std::size_t r = count; r-- > 1;) {
-                const auto backIndex = rowIndex(r);
-                const auto frontIndex = rowIndex(r - 1);
-                const auto& back = spectrumHistory.row(backIndex);
-                const auto& front = spectrumHistory.row(frontIndex);
-                const float backDepth = depthAt(backIndex);
-                const float frontDepth = depthAt(frontIndex);
-                draw->PrimReserve(6 * (beige::SpectrumHistory::bins - 1), 4 * (beige::SpectrumHistory::bins - 1));
-                for (std::size_t bin = 0; bin + 1 < beige::SpectrumHistory::bins; ++bin) {
-                    const float x0 = (float)bin / (beige::SpectrumHistory::bins - 1);
-                    const float x1 = (float)(bin + 1) / (beige::SpectrumHistory::bins - 1);
-                    const ImDrawIdx base = (ImDrawIdx)draw->_VtxCurrentIdx;
-                    draw->PrimWriteIdx(base); draw->PrimWriteIdx(base + 1); draw->PrimWriteIdx(base + 2);
-                    draw->PrimWriteIdx(base); draw->PrimWriteIdx(base + 2); draw->PrimWriteIdx(base + 3);
-                    draw->PrimWriteVtx(project(x0, backDepth, level(back[bin])), uv, color(back[bin], backDepth));
-                    draw->PrimWriteVtx(project(x1, backDepth, level(back[bin + 1])), uv, color(back[bin + 1], backDepth));
-                    draw->PrimWriteVtx(project(x1, frontDepth, level(front[bin + 1])), uv, color(front[bin + 1], frontDepth));
-                    draw->PrimWriteVtx(project(x0, frontDepth, level(front[bin])), uv, color(front[bin], frontDepth));
-                }
-                if (r % 4 == 0) {
-                    std::array<ImVec2, beige::SpectrumHistory::bins> ridge;
-                    for (std::size_t bin = 0; bin < ridge.size(); ++bin) {
-                        ridge[bin] = project((float)bin / (ridge.size() - 1), backDepth, level(back[bin]));
-                    }
-                    draw->AddPolyline(ridge.data(), (int)ridge.size(), IM_COL32(240, 240, 240, 38), 0, 1.0f);
+            std::array<std::size_t, beige::SpectrumHistory::capacity> columns{}, starts{};
+            std::size_t vertices = 0, indices = 0;
+            for (std::size_t r = 0; r < count; ++r) {
+                columns[r] = beige::spectrumColumns(size.x, r);
+                starts[r] = vertices;
+                vertices += columns[r] + 1;
+                if (r) { indices += 3 * (columns[r - 1] + columns[r]); }
+            }
+            const auto frontColumns = columns[0];
+            const std::size_t bottom = vertices, outline = bottom + frontColumns + 1;
+            vertices += 3 * (frontColumns + 1);
+            indices += 12 * frontColumns;
+            state.positions.assign(draw->VtxBuffer.Size, {0, -1, 0, 0, false});
+            state.positions.reserve(state.positions.size() + vertices);
+            draw->PrimReserve((int)indices, (int)vertices);
+            const unsigned int base = draw->_VtxCurrentIdx;
+            auto triangle = [&](std::size_t a, std::size_t b, std::size_t c) {
+                draw->PrimWriteIdx((ImDrawIdx)(base + a));
+                draw->PrimWriteIdx((ImDrawIdx)(base + b));
+                draw->PrimWriteIdx((ImDrawIdx)(base + c));
+            };
+            auto vertex = [&](float f, float depth, float height, ImU32 tint, float offsetY = 0, bool travels = false) {
+                draw->PrimWriteVtx(project(f, depth, height) + ImVec2(0, offsetY), uv, tint);
+                state.positions.push_back({f, depth, height, offsetY, travels});
+            };
+            auto sample = [&](std::size_t row, std::size_t bin) {
+                const auto& values = spectrumHistory.row(row);
+                const std::size_t first = (std::min)(bin * values.size() / columns[row], values.size() - 1);
+                const std::size_t end = (std::min)((std::max)(first + 1, (bin + 1) * values.size() / columns[row]), values.size());
+                return *std::max_element(values.begin() + first, values.begin() + end);
+            };
+            for (std::size_t r = 0; r < count; ++r) {
+                const float depth = depthAt(r);
+                for (std::size_t bin = 0; bin <= columns[r]; ++bin) {
+                    const float value = sample(r, bin);
+                    vertex((float)bin / columns[r], depth, level(value), color(value, depth), 0, r > 0);
                 }
             }
-            // Close the front face down to the floor so even one FFT is a real profile.
-            const auto& newest = spectrumHistory.row(0);
-            for (std::size_t bin = 0; bin + 1 < newest.size(); ++bin) {
-                const float x0 = (float)bin / (newest.size() - 1);
-                const float x1 = (float)(bin + 1) / (newest.size() - 1);
-                const ImVec2 face[] = {project(x0, 0, 0), project(x1, 0, 0), project(x1, 0, level(newest[bin + 1])), project(x0, 0, level(newest[bin]))};
-                draw->AddConvexPolyFilled(face, 4, color((std::max)(newest[bin], newest[bin + 1]), 0));
-                draw->AddLine(face[3], face[2], IM_COL32(250, 249, 236, 230), style::uiScale);
+            // Oldest strips first, with no index-based ridge lines to shimmer.
+            for (std::size_t r = count; r-- > 1;) {
+                beige::connectSpectrumRows(starts[r - 1], columns[r - 1], starts[r], columns[r], triangle);
+            }
+            for (std::size_t bin = 0; bin <= frontColumns; ++bin) {
+                vertex((float)bin / frontColumns, 0, 0, color(sample(0, bin), 0));
+            }
+            for (std::size_t bin = 0; bin <= frontColumns; ++bin) {
+                const float height = level(sample(0, bin));
+                vertex((float)bin / frontColumns, 0, height, IM_COL32(250, 249, 236, 230), -0.5f * style::uiScale);
+                vertex((float)bin / frontColumns, 0, height, IM_COL32(250, 249, 236, 230), 0.5f * style::uiScale);
+            }
+            for (std::size_t bin = 0; bin < frontColumns; ++bin) {
+                triangle(bottom + bin, bottom + bin + 1, bin + 1);
+                triangle(bottom + bin, bin + 1, bin);
+                triangle(outline + 2 * bin, outline + 2 * bin + 1, outline + 2 * bin + 3);
+                triangle(outline + 2 * bin, outline + 2 * bin + 3, outline + 2 * bin + 2);
             }
         }
+        else { state.positions.clear(); }
         draw->AddText(fftAreaMin + ImVec2(8, 8) * style::uiScale, text, "3D SPECTRUM / TIME");
         draw->PopClipRect();
         draw->PopTextureID();
@@ -191,6 +213,21 @@ void WaterFall::drawSpectrum3D() {
     const unsigned int base = draw->_VtxCurrentIdx;
     for (int i = 0; i < indexCount; ++i) { draw->_IdxWritePtr[i] = (ImDrawIdx)(base + spectrumMesh->IdxBuffer[i]); }
     memcpy(draw->_VtxWritePtr, spectrumMesh->VtxBuffer.Data, vertexCount * sizeof(ImDrawVert));
+    // Reproject cached vertices at display cadence. FFT cadence controls new
+    // data only, never Z movement. Keep the last displayed time when stopped.
+    const double now = std::chrono::duration<double, std::milli>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+    if (!spectrumHistory.size()) { state.displayTime = 0; }
+    else if (gui::mainWindow.isPlaying()) { state.displayTime = now; }
+    else { state.displayTime = (std::max)(state.displayTime, (double)spectrumHistory.latestTime()); }
+    const float advance = (float)((state.displayTime - spectrumHistory.latestTime()) / beige::SpectrumHistory::durationMs);
+    for (std::size_t i = 0; i < state.positions.size(); ++i) {
+        const auto& p = state.positions[i];
+        if (p.depth < 0) { continue; }
+        const float depth = p.travels ? std::clamp(p.depth + advance, 0.0f, 1.0f) : p.depth;
+        const float fade = std::clamp((1.0f - depth) / 0.06f, 0.0f, 1.0f);
+        draw->_VtxWritePtr[i].pos = project(p.frequency, depth, p.level * fade) + ImVec2(0, p.offsetY);
+    }
     draw->_IdxWritePtr += indexCount;
     draw->_VtxWritePtr += vertexCount;
     draw->_VtxCurrentIdx += vertexCount;
