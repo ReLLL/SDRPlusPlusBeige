@@ -9,6 +9,7 @@
 #include <http_debug_server.h>
 #include <algorithm>
 #include <array>
+#include <cfloat>
 #include <string>
 
 namespace beige::bandtoolbar {
@@ -38,6 +39,46 @@ ImVec4 tint(uint32_t rgb, float factor) {
     return {((rgb >> 16) & 255) / 255.0f * factor,
             ((rgb >> 8) & 255) / 255.0f * factor,
             (rgb & 255) / 255.0f * factor, 1};
+}
+
+void drawTooltip(const HamBand& band) {
+    const float scale = style::uiScale;
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(14, 12) * scale);
+    ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 5 * scale);
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8, 6) * scale);
+    ImGui::SetNextWindowSizeConstraints(ImVec2(320 * scale, 0), ImVec2(320 * scale, FLT_MAX));
+    ImGui::SetNextWindowBgAlpha(1.0f);
+    ImGui::BeginTooltip();
+    ImGui::PushFont(style::baseFont);
+    ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 292 * scale);
+    ImGui::PushFont(style::mediumFont);
+    ImGui::TextColored(tint(band.color, 1.3f), "%s band", band.label);
+    ImGui::PopFont();
+    ImGui::TextDisabled("%.3f - %.3f MHz", band.lowerHz / 1e6, band.upperHz / 1e6);
+    ImGui::Separator();
+    ImGui::Spacing();
+    ImGui::PushFont(style::tinyFont);
+    ImGui::TextDisabled("BEST TIME TO OPERATE");
+    ImGui::PopFont();
+    ImGui::TextUnformatted(band.bestTime);
+    ImGui::Spacing();
+    ImGui::PushFont(style::tinyFont);
+    ImGui::TextDisabled("TYPICAL USE");
+    ImGui::PopFont();
+    ImGui::TextUnformatted(band.typicalUse);
+    ImGui::Spacing();
+    ImGui::PushFont(style::tinyFont);
+    ImGui::TextDisabled("TYPICAL DISTANCE");
+    ImGui::PopFont();
+    ImGui::TextUnformatted(band.typicalDistance);
+    ImGui::Spacing();
+    ImGui::PushFont(style::tinyFont);
+    ImGui::TextDisabled("Approximate routine ranges; setup and conditions matter.");
+    ImGui::PopFont();
+    ImGui::PopTextWrapPos();
+    ImGui::PopFont();
+    ImGui::EndTooltip();
+    ImGui::PopStyleVar(3);
 }
 
 } // namespace
@@ -108,12 +149,7 @@ void draw(float snr, float topY) {
         const bool hovered = ImGui::IsItemHovered();
         ImGui::PopStyleVar();
         ImGui::PopStyleColor(5);
-        if (hovered) {
-            ImGui::PushFont(style::baseFont);
-            ImGui::SetTooltip("%s | %.3f-%.3f MHz\nCenter: %.5f MHz", band.label,
-                band.lowerHz / 1e6, band.upperHz / 1e6, band.centerHz() / 1e6);
-            ImGui::PopFont();
-        }
+        if (hovered) { drawTooltip(band); }
         x += widths[i] + gap;
     }
     ImGui::PopID();

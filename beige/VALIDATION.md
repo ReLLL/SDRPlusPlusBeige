@@ -47,3 +47,9 @@ The QA profile's VFO must remain inside the synthetic recording bandwidth. A sta
 The final 1.3.8 package passed all 16 band jumps in free mode and all 16 in center mode. Each jump set the exact chart-based frequency, spectrum center and zero VFO/view offsets. The saved mode and single-click behavior stayed unchanged. Each case began with a VFO move: free mode retained an offset; center mode followed it by retuning. Toolbar rendering was inspected in wide and 1,280-pixel windows, including the two-row layout, selected outline and readable tooltip.
 
 History tests, public plugin ABI comparison, build, Python smoke-script compilation, whitespace check and complete app signature verification passed. Removal of CW Notebook and Advanced FT8/FT4 changed only plugin load paths and their two module-instance entries in the active profile. The previous configuration and plugin payloads were backed up; notebook data was preserved.
+
+## Band information tooltips (October 20)
+
+Build 1.3.11 adds formatted operating-time, typical-use and approximate distance sections, with no center frequency. A visual QA preview left enabled in 1.3.10 caused a tooltip to follow the pointer outside the band buttons. The preview state and endpoint were removed entirely. Native UI checks confirmed the 20m panel appears over its button and disappears over the spectrum and other controls. The panel background is opaque.
+
+All 16 band jumps passed again in the isolated free-tuning profile. The full build, history test, public plugin ABI comparison, whitespace check and packaged app signature verification passed. Distance ranges are qualified editorial estimates, not measured averages or record maxima.

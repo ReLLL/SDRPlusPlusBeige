@@ -54,10 +54,16 @@ Normal launches disable the HTTP debug server. For QA, explicitly pass `--http P
 
 The toolbar offers 160m, 80m, 60m, 40m, 30m, 20m, 17m, 15m, 12m, 10m, 6m, 2m, 1.25m, 70cm, 33cm and 23cm in that order. Receive-navigation ranges and colors follow Oz's supplied chart. The presets are independent of the selected band-plan overlay.
 
-Centers in MHz, in the same order: 1.900, 3.750, 5.36750, 7.150, 10.125, 14.175, 18.114, 21.225, 24.940, 28.850, 52.000, 146.000, 223.500, 435.000, 915.000 and 1270.000. The tooltip shows each range and exact center.
+Centers in MHz, in the same order: 1.900, 3.750, 5.36750, 7.150, 10.125, 14.175, 18.114, 21.225, 24.940, 28.850, 52.000, 146.000, 223.500, 435.000, 915.000 and 1270.000. Tooltips show the band, frequency range, best operating time, typical use and typical distance. The center frequency is intentionally omitted.
 
 A selection calls the existing center-tuning operation once. It resets the selected VFO and spectrum view offsets and saves the new frequency. It never changes `MainWindow::tuningMode`, `centerTuning` or `VFOMoveSingleClick`; subsequent tuning keeps its original behavior. No exported object layout changes are required.
 
 The existing 12-point utility font, small rounded color fills, a selected-band outline and adaptive rows keep the controls compact. Wide windows use one row to the right of the tuning controls; medium windows use two. When that space cannot fit two rows, the band strip moves below the controls. The SNR meter and logo retain their space.
 
 QA-only endpoints: `/proc/display/ham-band` selects a band by label, and `/proc/display/ham-band-state` reports frequency, spectrum center, offsets and tuning flags. Run `python3 beige/tests/ham_bands_smoke.py --url http://127.0.0.1:18863` against a separate free-tuning QA profile; repeat with `--center-tuning` against a centered QA profile. Each pass moves the VFO before every band jump: free mode retains the offset, while center mode follows the move by retuning.
+
+Tooltips appear only while the corresponding band button is hovered and disappear when the pointer leaves. No forced-preview override remains. The tooltip uses a colored heading, a muted frequency range and three spaced sections in an opaque 320-point panel with wrapped text.
+
+Typical Distance values are rough planning ranges for ordinary contacts, not record maxima or measured population averages. Separate local FM/repeater use from directional weak-signal operation and routine HF DX. Satellite footprints, EME path lengths and rare long-distance propagation records are excluded. Do not relabel one-way WSPR spots as QSOs or claim the editorial ranges are statistical averages.
+
+Primary context: [ARRL introduction to HF/VHF band behavior](https://www.arrl.org/files/file/Ham%20Radio%20License%20Manual/HRLM%203rd%20ed/Choosing%20a%20Ham%20Radio-2014.pdf), [ARRL beginner guidance on local/repeater reach](https://www3.arrl.org/files/file/Get%20Licensed/Quickstart%20Guide%20EBOOK.pdf), [ARRL propagation discussion](https://www.arrl.org/files/file/QST/This%20Month%20in%20QST/2021/06%20June%202021/2106%20Stanley%20article%20of%20the%20month.pdf), [K1RA's published rover QSO tables](https://k1ra.us/roving/k1ra-k8gp-rover-arrl-june-vhf-2016/) and [operators' reports in the 2022 ARRL 222 MHz and Up contest](https://contests.arrl.org/222/soaps/2022/). These support the propagation/mode distinctions and examples; the tooltip ranges remain editorial estimates rather than averages computed from those reports.
