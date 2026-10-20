@@ -40,6 +40,8 @@ The Codec2 compatibility header is generated inside the build folder from the de
 
 ## Private profile import
 
+On October 20, Oz requested removal of CW Notebook and Advanced FT8/FT4 from the installed Beige profile. Their load paths and module instances were removed. Plugin payloads and the original configuration are retained in the profile's `plugin-removal-backups/`; CW logs and DX history remain in their existing data folders. Brown is unchanged. Do not reimport these plugins into the active profile without a new request.
+
 Default Beige profile: `~/Library/Application Support/sdrpp-beige`. The importer preserves module instances and enabled/disabled states, selected band plan, source settings and exact frequency-manager bytes. It remaps Brown paths to Beige. Recordings and backup directories are not imported.
 
 Custom plugin binaries are copied from the installed version and relocated to Beige's core and dependency paths. Private helper runtimes stay beside their plugins. Copied binaries are signed and checked; original Brown binaries are untouched. Plugin payload manifests are updated after relocation.
@@ -47,3 +49,15 @@ Custom plugin binaries are copied from the installed version and relocated to Be
 DX Notebook's SQLite database uses SQLite's read-only backup API so committed WAL transactions are included. CSV and map cache are copied separately. CW logs are copied into Beige's profile. Process-local data-root overrides isolate both notebooks from Brown.
 
 Normal launches disable the HTTP debug server. For QA, explicitly pass `--http PORT`. Useful endpoints: `/proc/display/spectrum3d` (read/write boolean) and `/proc/display/spectrum-stats` (CPU drawing times, mesh size, rebuilds and history rows). CPU drawing time excludes the GPU's execution time.
+
+## HAM band toolbar
+
+The toolbar offers 160m, 80m, 60m, 40m, 30m, 20m, 17m, 15m, 12m, 10m, 6m, 2m, 1.25m, 70cm, 33cm and 23cm in that order. Receive-navigation ranges and colors follow Oz's supplied chart. The presets are independent of the selected band-plan overlay.
+
+Centers in MHz, in the same order: 1.900, 3.750, 5.36750, 7.150, 10.125, 14.175, 18.114, 21.225, 24.940, 28.850, 52.000, 146.000, 223.500, 435.000, 915.000 and 1270.000. The tooltip shows each range and exact center.
+
+A selection calls the existing center-tuning operation once. It resets the selected VFO and spectrum view offsets and saves the new frequency. It never changes `MainWindow::tuningMode`, `centerTuning` or `VFOMoveSingleClick`; subsequent tuning keeps its original behavior. No exported object layout changes are required.
+
+The existing 12-point utility font, small rounded color fills, a selected-band outline and adaptive rows keep the controls compact. Wide windows use one row to the right of the tuning controls; medium windows use two. When that space cannot fit two rows, the band strip moves below the controls. The SNR meter and logo retain their space.
+
+QA-only endpoints: `/proc/display/ham-band` selects a band by label, and `/proc/display/ham-band-state` reports frequency, spectrum center, offsets and tuning flags. Run `python3 beige/tests/ham_bands_smoke.py --url http://127.0.0.1:18863` against a separate free-tuning QA profile; repeat with `--center-tuning` against a centered QA profile. Each pass moves the VFO before every band jump: free mode retains the offset, while center mode follows the move by retuning.

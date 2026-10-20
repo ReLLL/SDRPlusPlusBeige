@@ -31,6 +31,7 @@
 #include <gui/dialogs/loading_screen.h>
 #include <gui/colormaps.h>
 #include <gui/widgets/snr_meter.h>
+#include <gui/widgets/ham_band_toolbar.h>
 #include <gui/tuner.h>
 #include <dsp/buffer/buffer.h>
 #include <utils/wstr.h>
@@ -184,6 +185,7 @@ void MainWindow::init() {
     sinkmenu::init();
     bandplanmenu::init();
     displaymenu::init();
+    beige::bandtoolbar::init();
     vfo_color_menu::init();
     module_manager_menu::init();
 
@@ -426,14 +428,7 @@ void MainWindow::drawUpperLine(ImGui::WaterfallVFO* vfo) {
     if (ImGui::IsItemHovered()) { ImGui::SetTooltip("Switch 2D / 3D spectrum"); }
     ImGui::SameLine();
 
-    int snrOffset = 87.0f * style::uiScale;
-    int snrWidth = std::clamp<int>(ImGui::GetWindowSize().x - ImGui::GetCursorPosX() - snrOffset, 100.0f * style::uiScale, 300.0f * style::uiScale);
-    int snrPos = std::max<int>(ImGui::GetWindowSize().x - (snrWidth + snrOffset), ImGui::GetCursorPosX());
-
-    ImGui::SetCursorPosX(snrPos);
-    ImGui::SetCursorPosY(origY + (5.0f * style::uiScale));
-    ImGui::SetNextItemWidth(snrWidth);
-    ImGui::SNRMeter((vfo != NULL) ? gui::waterfall.selectedVFOSNR : 0);
+    beige::bandtoolbar::draw((vfo != NULL) ? gui::waterfall.selectedVFOSNR : 0, origY);
 }
 
 long long lastDrawTime = 0;

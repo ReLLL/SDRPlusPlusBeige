@@ -41,3 +41,9 @@ The correction uses display-time projection, fixed capture timestamps, every ret
 Synthetic IQ measurements during development: 1,280-pixel window mean spectrum CPU drawing time 0.394 ms, 95th percentile 1.097 ms, median UI rate 74.6 fps. The preceding build measured 0.145 ms mean and 72.9 fps in that session. A 1,512-pixel window measured 0.598 ms mean, 2.018 ms at the 95th percentile and 99.9 fps. Different display refresh rates prevent comparing those two window sizes by frame rate. These timings exclude GPU execution. An eight-second Time Profiler capture targeted the exact QA process and confirmed spectrum drawing frames; only environment-free sample exports are retained.
 
 The QA profile's VFO must remain inside the synthetic recording bandwidth. A stale near-edge VFO offset triggered the existing signal-info bounds bug in both the old and revised builds; resetting that isolated profile's VFO to the center removed the unrelated failure.
+
+## HAM toolbar (October 20)
+
+The final 1.3.8 package passed all 16 band jumps in free mode and all 16 in center mode. Each jump set the exact chart-based frequency, spectrum center and zero VFO/view offsets. The saved mode and single-click behavior stayed unchanged. Each case began with a VFO move: free mode retained an offset; center mode followed it by retuning. Toolbar rendering was inspected in wide and 1,280-pixel windows, including the two-row layout, selected outline and readable tooltip.
+
+History tests, public plugin ABI comparison, build, Python smoke-script compilation, whitespace check and complete app signature verification passed. Removal of CW Notebook and Advanced FT8/FT4 changed only plugin load paths and their two module-instance entries in the active profile. The previous configuration and plugin payloads were backed up; notebook data was preserved.

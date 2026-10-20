@@ -7,6 +7,7 @@ An SDR++Brown fork with a fast, perspective 3D spectrum display. Frequency runs 
 - The 3D surface uses the selected waterfall palette and its level range. The regular waterfall remains below it.
 - Fixed history storage, peak-preserving reduction, bounded geometry and a cached mesh keep rendering inexpensive.
 - Separate Beige settings and decoder histories support side-by-side installation with Brown.
+- Compact, color-coded HAM band buttons center the receiver and spectrum without changing center/free tuning mode. All 16 bands from 160m to 23cm are one click away.
 
 This is a macOS development build. Its bundled Homebrew libraries currently require macOS 26 or newer. It is locally ad-hoc signed; public distribution has not been prepared.
 
