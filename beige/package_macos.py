@@ -13,7 +13,7 @@ def run(*args):
     return subprocess.check_output(args, text=True, stderr=subprocess.STDOUT)
 
 
-def package(build, brown_app=None):
+def package(build, brown_app=None, usb_prefix=None):
     root = pathlib.Path(__file__).resolve().parents[1]
     build = build.resolve()
     install = build / 'install'
@@ -105,6 +105,13 @@ def package(build, brown_app=None):
         if destination.suffix == '.dylib':
             run('install_name_tool', '-id', '@rpath/' + destination.name, str(destination))
 
+    if usb_prefix:
+        # Every plugin must share the patched backend, including Brown carryovers.
+        usb_prefix = usb_prefix.resolve()
+        copy_binary(usb_prefix / 'lib/libusb-1.0.0.dylib', contents / 'Frameworks/libusb-1.0.0.dylib')
+        shutil.copy2(usb_prefix / 'share/licenses/libusb/COPYING', contents / 'Resources/libusb-COPYING')
+        shutil.copy2(usb_prefix / 'beige-libusb.json', contents / 'Resources/beige-libusb.json')
+        shutil.copy2(root / 'beige/patches/libusb-darwin-disconnect.patch', contents / 'Resources/libusb-darwin-disconnect.patch')
     copy_binary(install / 'bin/sdrpp', contents / 'MacOS/sdrpp')
     copy_binary(install / 'lib/libsdrpp_core.dylib', contents / 'Frameworks/libsdrpp_core.dylib')
     for plugin in sorted((install / 'lib/sdrpp/plugins').glob('*.dylib')):
@@ -126,5 +133,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('build', type=pathlib.Path)
     parser.add_argument('--brown-app', type=pathlib.Path)
+    parser.add_argument('--usb-prefix', type=pathlib.Path)
     options = parser.parse_args()
-    package(options.build, options.brown_app)
+    package(options.build, options.brown_app, options.usb_prefix)

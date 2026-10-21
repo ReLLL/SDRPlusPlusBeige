@@ -7,6 +7,8 @@
 #include <config.h>
 #include <gui/smgui.h>
 #include <rtl-sdr.h>
+#include <atomic>
+#include <http_debug_server.h>
 
 #ifdef __ANDROID__
 #include <android_backend.h>
@@ -93,9 +95,21 @@ public:
         selectByName(selectedDevName);
 
         sigpath::sourceManager.registerSource("RTL-SDR", &handler);
+        httpdebug::procfs::registerEndpoint("/source/RTL-SDR/device", [this]() {
+            return json{{"count", devCount}, {"selected", selectedDevName},
+                {"index", devId}, {"gains", gainList.size()}, {"running", running},
+                {"refreshes", refreshCount}}.dump();
+        }, [this](const std::string& action) {
+            if (action == "refresh" && !running) {
+                refresh();
+                selectByName(selectedDevName);
+                propagateInputSampleRate(this);
+            }
+        }, httpdebug::procfs::Type::String);
     }
 
     ~RTLSDRSourceModule() {
+        httpdebug::procfs::unregister("/source/RTL-SDR/device");
         stop(this);
         sigpath::sourceManager.unregisterSource("RTL-SDR");
     }
@@ -115,6 +129,8 @@ public:
     }
 
     void refresh() {
+        if (running) { return; }
+        ++refreshCount;
         devNames.clear();
         devListTxt = "";
 
@@ -125,6 +141,7 @@ public:
         char prodBuf[256];
         char snBuf[256];
         for (int i = 0; i < devCount; i++) {
+            venBuf[0] = prodBuf[0] = snBuf[0] = '\0';
             // Gather device info
             const char* devName = rtlsdr_get_device_name(i);
             int snErr = rtlsdr_get_device_usb_strings(i, venBuf, prodBuf, snBuf);
@@ -162,6 +179,13 @@ public:
         if (devCount > 0) {
             selectById(0);
         }
+        else {
+            selectedDevName.clear();
+            devId = 0;
+            gainList.clear();
+            gainId = 0;
+            updateGainTxt();
+        }
     }
 
     void selectByName(std::string name) {
@@ -175,15 +199,20 @@ public:
     }
 
     void selectById(int id) {
+        if (running || id < 0 || id >= (int)devNames.size()) { return; }
+        devId = id;
         selectedDevName = devNames[id];
+        gainList.clear();
+        updateGainTxt();
+        rtlsdr_dev_t* probe = nullptr;
 
 #ifndef __ANDROID__
-        int oret = rtlsdr_open(&openDev, id);
+        int oret = rtlsdr_open(&probe, id);
 #else
-        int oret = rtlsdr_open_sys_dev(&openDev, devFd);
+        int oret = rtlsdr_open_sys_dev(&probe, devFd);
 #endif
         
-        if (oret < 0) {
+        if (oret < 0 || !probe) {
             selectedDevName = "";
             flog::error("Could not open RTL-SDR: {0}", oret);
             return;
@@ -191,7 +220,7 @@ public:
 
         gainList.clear();
         int gains[256];
-        int n = rtlsdr_get_tuner_gains(openDev, gains);
+        int n = std::clamp(rtlsdr_get_tuner_gains(probe, gains), 0, 256);
         gainList = std::vector<int>(gains, gains + n);
         std::sort(gainList.begin(), gainList.end());
 
@@ -249,12 +278,12 @@ public:
             gainId = config.conf["devices"][selectedDevName]["gain"];
         }
 
-        if (gainId >= gainList.size()) { gainId = gainList.size() - 1; }
+        gainId = std::clamp(gainId, 0, (std::max)(0, (int)gainList.size() - 1));
         updateGainTxt();
 
         config.release(created);
 
-        rtlsdr_close(openDev);
+        rtlsdr_close(probe);
     }
 
 private:
@@ -297,7 +326,8 @@ private:
         int oret = rtlsdr_open_sys_dev(&_this->openDev, _this->devFd);
 #endif
 
-        if (oret < 0) {
+        if (oret < 0 || !_this->openDev) {
+            _this->openDev = nullptr;
             flog::error("Could not open RTL-SDR");
             return;
         }
@@ -311,21 +341,21 @@ private:
         rtlsdr_set_direct_sampling(_this->openDev, _this->directSamplingMode);
         rtlsdr_set_bias_tee(_this->openDev, _this->biasT);
         rtlsdr_set_agc_mode(_this->openDev, _this->rtlAgc);
-        rtlsdr_set_tuner_gain(_this->openDev, _this->gainList[_this->gainId]);
+        if (!_this->gainList.empty()) { rtlsdr_set_tuner_gain(_this->openDev, _this->gainList[_this->gainId]); }
         if (_this->tunerAgc) {
             rtlsdr_set_tuner_gain_mode(_this->openDev, 0);
         }
         else {
             rtlsdr_set_tuner_gain_mode(_this->openDev, 1);
-            rtlsdr_set_tuner_gain(_this->openDev, _this->gainList[_this->gainId]);
+            if (!_this->gainList.empty()) { rtlsdr_set_tuner_gain(_this->openDev, _this->gainList[_this->gainId]); }
         }
         rtlsdr_set_offset_tuning(_this->openDev, _this->offsetTuning);
 
         _this->asyncCount = (int)roundf(_this->sampleRate / (200 * 512)) * 512;
 
-        _this->workerThread = std::thread(&RTLSDRSourceModule::worker, _this);
-
+        _this->workerEnded = false;
         _this->running = true;
+        _this->workerThread = std::thread(&RTLSDRSourceModule::worker, _this);
         flog::info("RTLSDRSourceModule '{0}': Start!", _this->name);
     }
 
@@ -338,6 +368,7 @@ private:
         if (_this->workerThread.joinable()) { _this->workerThread.join(); }
         _this->stream.clearWriteStop();
         rtlsdr_close(_this->openDev);
+        _this->openDev = nullptr;
         flog::info("RTLSDRSourceModule '{0}': Stop!", _this->name);
     }
 
@@ -366,6 +397,13 @@ private:
 
     static void menuHandler(void* ctx) {
         RTLSDRSourceModule* _this = (RTLSDRSourceModule*)ctx;
+        if (_this->running && _this->workerEnded.load()) {
+            // USB removal ends async reading. Join and close on the UI thread.
+            gui::mainWindow.setPlayState(false);
+            stop(_this);
+            _this->refresh();
+            _this->selectByName(_this->selectedDevName);
+        }
 
         if (_this->running) { SmGui::BeginDisabled(); }
         SmGui::FillWidth();
@@ -417,7 +455,7 @@ private:
                     }
                     else {
                         rtlsdr_set_tuner_gain_mode(_this->openDev, 1);
-                        rtlsdr_set_tuner_gain(_this->openDev, _this->gainList[_this->gainId]);
+                        if (!_this->gainList.empty()) { rtlsdr_set_tuner_gain(_this->openDev, _this->gainList[_this->gainId]); }
                     }
                 }
             }
@@ -449,9 +487,9 @@ private:
         SmGui::ForceSync();
         // TODO: FIND ANOTHER WAY
         if (_this->serverMode) {
-            if (SmGui::SliderInt(CONCAT("##_rtlsdr_gain_", _this->name), &_this->gainId, 0, _this->gainList.size() - 1, SmGui::FMT_STR_NONE)) {
+            if (SmGui::SliderInt(CONCAT("##_rtlsdr_gain_", _this->name), &_this->gainId, 0, (std::max)(0, (int)_this->gainList.size() - 1), SmGui::FMT_STR_NONE)) {
                 _this->updateGainTxt();
-                if (_this->running) {
+                if (_this->running && !_this->gainList.empty()) {
                     rtlsdr_set_tuner_gain(_this->openDev, _this->gainList[_this->gainId]);
                 }
                 if (_this->selectedDevName != "") {
@@ -462,10 +500,10 @@ private:
             }
         }
         else {
-            if (ImGui::SliderInt(CONCAT("##_rtlsdr_gain_", _this->name), &_this->gainId, 0, _this->gainList.size() - 1, _this->dbTxt)) {
+            if (ImGui::SliderInt(CONCAT("##_rtlsdr_gain_", _this->name), &_this->gainId, 0, (std::max)(0, (int)_this->gainList.size() - 1), _this->dbTxt)) {
                 _this->updateGainTxt();
                 if (_this->running) {
-                    rtlsdr_set_tuner_gain(_this->openDev, _this->gainList[_this->gainId]);
+                    if (!_this->gainList.empty()) { rtlsdr_set_tuner_gain(_this->openDev, _this->gainList[_this->gainId]); }
                 }
                 if (_this->selectedDevName != "") {
                     config.acquire();
@@ -529,7 +567,7 @@ private:
                 }
                 else {
                     rtlsdr_set_tuner_gain_mode(_this->openDev, 1);
-                    rtlsdr_set_tuner_gain(_this->openDev, _this->gainList[_this->gainId]);
+                    if (!_this->gainList.empty()) { rtlsdr_set_tuner_gain(_this->openDev, _this->gainList[_this->gainId]); }
                 }
             }
             if (_this->selectedDevName != "") {
@@ -543,6 +581,7 @@ private:
     void worker() {
         rtlsdr_reset_buffer(openDev);
         rtlsdr_read_async(openDev, asyncHandler, this, 0, asyncCount);
+        workerEnded = true;
     }
 
     static void asyncHandler(unsigned char* buf, uint32_t len, void* ctx) {
@@ -556,21 +595,25 @@ private:
     }
 
     void updateGainTxt() {
+        if (gainList.empty()) { strcpy(dbTxt, "--"); return; }
+        gainId = std::clamp(gainId, 0, (int)gainList.size() - 1);
         snprintf(dbTxt, sizeof dbTxt, "%.1f dB", (float)gainList[gainId] / 10.0f);
     }
 
     std::string name;
-    rtlsdr_dev_t* openDev;
+    rtlsdr_dev_t* openDev = nullptr;
     bool enabled = true;
     dsp::stream<dsp::complex_t> stream;
     double sampleRate;
     SourceManager::SourceHandler handler;
     bool running = false;
+    std::atomic<bool> workerEnded{false};
     double freq;
     std::string selectedDevName = "";
     int devId = 0;
     int srId = 0;
     int devCount = 0;
+    int refreshCount = 0;
     std::thread workerThread;
     bool serverMode = false;
 

@@ -53,3 +53,9 @@ History tests, public plugin ABI comparison, build, Python smoke-script compilat
 Build 1.3.11 adds formatted operating-time, typical-use and approximate distance sections, with no center frequency. A visual QA preview left enabled in 1.3.10 caused a tooltip to follow the pointer outside the band buttons. The preview state and endpoint were removed entirely. Native UI checks confirmed the 20m panel appears over its button and disappears over the spectrum and other controls. The panel background is opaque.
 
 All 16 band jumps passed again in the isolated free-tuning profile. The full build, history test, public plugin ABI comparison, whitespace check and packaged app signature verification passed. Distance ranges are qualified editorial estimates, not measured averages or record maxima.
+
+## RTL-SDR hotplug crash (October 21)
+
+Build 1.3.13 includes the private patched USB backend and source-state corrections described in [USB-HOTPLUG.md](USB-HOTPLUG.md). LLDB reproduced the reported null-interface failure in pristine libusb. The fixed native test passed the missing-interface case and 1,000 simulated removals during submission. Both CTest checks, public plugin ABI comparison, build, Python compilation, whitespace and complete bundle signature checks passed. The packaged backend's code section and provenance receipt matched the private build.
+
+The isolated QA profile received live RF from the RTL-SDR Blog V4. Ten automated refresh/start/stop cycles passed, including rejecting refresh while the read handle was active. No synthetic reception was added to the normal profile. Physical unplug/replug verification remains pending; these checks do not cover every USB hub or disconnect timing.
