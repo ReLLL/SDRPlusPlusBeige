@@ -59,3 +59,11 @@ All 16 band jumps passed again in the isolated free-tuning profile. The full bui
 Build 1.3.13 includes the private patched USB backend and source-state corrections described in [USB-HOTPLUG.md](USB-HOTPLUG.md). LLDB reproduced the reported null-interface failure in pristine libusb. The fixed native test passed the missing-interface case and 1,000 simulated removals during submission. Both CTest checks, public plugin ABI comparison, build, Python compilation, whitespace and complete bundle signature checks passed. The packaged backend's code section and provenance receipt matched the private build.
 
 The isolated QA profile received live RF from the RTL-SDR Blog V4. Ten automated refresh/start/stop cycles passed, including rejecting refresh while the read handle was active. No synthetic reception was added to the normal profile. Oz subsequently confirmed that physical unplug/replug followed by Refresh recovers and receives normally in installed 1.3.13. This verifies the reported scenario on his setup; it does not cover every USB hub or disconnect timing.
+
+## Audio NR2 heap corruption (October 21)
+
+The 1.3.13 report crashed in the OMLSA/MCRA worker's FFT reorder step. LLDB disassembly showed an invalid index read from its table. Running the actual numerical denoiser under AddressSanitizer reproduced an earlier heap write in `G_calculate_process`: mirroring bin zero to index N wrote past an N-element SNR array. The smoothed-SNR array had the same error; the spectrum mirror also crossed into the following packed spectrum.
+
+Build 1.3.14 skips the mirror write for DC in all three places. DC already occupies bin zero. No valid positive-frequency mirror indexes or FFT geometry changed. The standalone regression processes 8,000 blocks, equivalent to 12.8 minutes at 48 kHz, including silence, seeded noise, tones and full-scale square waves. It passes AddressSanitizer and is included in CTest on macOS.
+
+The full package passed all three CTest checks, the plugin ABI comparison, build and signature verification. An isolated synthetic receiver with Audio NR2 enabled delivered audio samples through ten start/stop cycles. LLDB hit the corrected FFT through the same AFNR/OMLSA processing stack shown in the report. The normal receiver profile was not used for synthetic data. Visual and listening checks remain pending because the Mac was locked.

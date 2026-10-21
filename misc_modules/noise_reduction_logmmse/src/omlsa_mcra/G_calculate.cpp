@@ -302,7 +302,7 @@ void G_calculate::SpeechAbsenceEstm()
 		m_q[k] = m_num_mag_pow - ((__int64)m_plocal[k] * m_pglobal[k] * p_frame >> 28);//10000
 		m_q[k] = min<int>(m_q[k], 0.95*m_num_mag_pow);
 		m_old_cosen[k] = m_cosen[k];
-		m_old_cosen[m_lwlen - k] = m_old_cosen[k];
+		if (k != 0) { m_old_cosen[m_lwlen - k] = m_old_cosen[k]; }
 	}
 }
 short G_calculate::G_calculate_process(Complex_num* winData, int blockInd) {  // -49
@@ -319,7 +319,7 @@ short G_calculate::G_calculate_process(Complex_num* winData, int blockInd) {  //
 		m_post_SNR[i] = min<int>((__int64)pow((((__int64)m_abs_Y[i] * m_num_mag_pow) / (1 > m_lamda_d[i] ? 1 : m_lamda_d[i])), 2) >> m_amp_para_double, 4096 << 14);
 		post_temp = max<int>(m_post_SNR[i] - m_num_mag_pow, 0);
 		m_E_pr_SNR[i] = min<int>(max<int>((m_pr_SNR[i] >> 1) + (m_pr_SNR[i] >> 2) + (m_pr_SNR[i] >> 3) + (post_temp >> 3), m_snpramin), 4096 << m_amp_para_double);
-		m_E_pr_SNR[m_lwlen - i] = m_E_pr_SNR[i];                                                // 0.0001 * (2^24=16777216) =1678  167772 
+		if (i != 0) { m_E_pr_SNR[m_lwlen - i] = m_E_pr_SNR[i]; }
 		m_v[i] = max<__int64>(min<__int64>((__int64)((__int64)m_E_pr_SNR[i] * m_post_SNR[i] << 10) / (m_num_mag_pow + m_E_pr_SNR[i]), 15 << 24), 1678);
 		m_integra[i] = expintpow_solution(m_v[i]);  // ����ֵ�Ŵ�14��  =exp(expint(v)/2)
 		m_Gh1[i] = min<int>((__int64)m_E_pr_SNR[i] * m_integra[i] / (m_num_mag_pow + m_E_pr_SNR[i]), 70 << 14);
@@ -339,8 +339,11 @@ short G_calculate::G_calculate_process(Complex_num* winData, int blockInd) {  //
 		winData[i].real = ((__int64)m_M[i] * m_EN_cos[i]) >> 12; 
 		winData[i].imag = ((__int64)m_M[i] * m_EN_sin[i]) >> 12;
 		m_pr_SNR[i] = min<int>(pow((__int64)m_M[i] * m_num_mag / (1 > m_lamda_d[i] ? 1 : m_lamda_d[i]), 2), 4096 << m_amp_para_double);  // 10000
-		winData[m_lwlen - i].real = winData[i].real;
-		winData[m_lwlen - i].imag = -winData[i].imag;
+		// DC is its own mirror. Index N is outside this N-bin spectrum.
+		if (i != 0) {
+			winData[m_lwlen - i].real = winData[i].real;
+			winData[m_lwlen - i].imag = -winData[i].imag;
+		}
 		aa[i] = m_G[i];
 	}
 	
