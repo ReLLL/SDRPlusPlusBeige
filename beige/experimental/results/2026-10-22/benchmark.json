@@ -1,0 +1,471 @@
+{
+  "runs": [
+    {
+      "mode": "reference",
+      "rate": 204800,
+      "samples": 815104,
+      "wall_seconds": 0.0876661,
+      "cpu_seconds": 0.086677,
+      "cpu_percent": 2.16693,
+      "chunk": 1024,
+      "repeat": 0
+    },
+    {
+      "mode": "wiener",
+      "rate": 204800,
+      "samples": 815104,
+      "wall_seconds": 0.0760951,
+      "cpu_seconds": 0.075238,
+      "cpu_percent": 1.88095,
+      "chunk": 1024,
+      "repeat": 0
+    },
+    {
+      "mode": "framewise",
+      "rate": 204800,
+      "samples": 815104,
+      "wall_seconds": 0.0740171,
+      "cpu_seconds": 0.073235,
+      "cpu_percent": 1.83088,
+      "chunk": 1024,
+      "repeat": 0
+    },
+    {
+      "mode": "framewiener",
+      "rate": 204800,
+      "samples": 815104,
+      "wall_seconds": 0.0649493,
+      "cpu_seconds": 0.064138,
+      "cpu_percent": 1.60345,
+      "chunk": 1024,
+      "repeat": 0
+    },
+    {
+      "mode": "balanced",
+      "rate": 204800,
+      "samples": 815104,
+      "wall_seconds": 0.0843616,
+      "cpu_seconds": 0.083511,
+      "cpu_percent": 2.08778,
+      "chunk": 1024,
+      "repeat": 0
+    },
+    {
+      "mode": "balanced",
+      "rate": 204800,
+      "samples": 815104,
+      "wall_seconds": 0.084323,
+      "cpu_seconds": 0.083624,
+      "cpu_percent": 2.0906,
+      "chunk": 1024,
+      "repeat": 1
+    },
+    {
+      "mode": "framewiener",
+      "rate": 204800,
+      "samples": 815104,
+      "wall_seconds": 0.0632842,
+      "cpu_seconds": 0.062545,
+      "cpu_percent": 1.56362,
+      "chunk": 1024,
+      "repeat": 1
+    },
+    {
+      "mode": "framewise",
+      "rate": 204800,
+      "samples": 815104,
+      "wall_seconds": 0.07422,
+      "cpu_seconds": 0.073523,
+      "cpu_percent": 1.83808,
+      "chunk": 1024,
+      "repeat": 1
+    },
+    {
+      "mode": "wiener",
+      "rate": 204800,
+      "samples": 815104,
+      "wall_seconds": 0.0755168,
+      "cpu_seconds": 0.074725,
+      "cpu_percent": 1.86813,
+      "chunk": 1024,
+      "repeat": 1
+    },
+    {
+      "mode": "reference",
+      "rate": 204800,
+      "samples": 815104,
+      "wall_seconds": 0.0853999,
+      "cpu_seconds": 0.084607,
+      "cpu_percent": 2.11518,
+      "chunk": 1024,
+      "repeat": 1
+    },
+    {
+      "mode": "reference",
+      "rate": 204800,
+      "samples": 815104,
+      "wall_seconds": 0.084479,
+      "cpu_seconds": 0.083663,
+      "cpu_percent": 2.09158,
+      "chunk": 1024,
+      "repeat": 2
+    },
+    {
+      "mode": "wiener",
+      "rate": 204800,
+      "samples": 815104,
+      "wall_seconds": 0.0744554,
+      "cpu_seconds": 0.073705,
+      "cpu_percent": 1.84263,
+      "chunk": 1024,
+      "repeat": 2
+    },
+    {
+      "mode": "framewise",
+      "rate": 204800,
+      "samples": 815104,
+      "wall_seconds": 0.0738951,
+      "cpu_seconds": 0.073083,
+      "cpu_percent": 1.82708,
+      "chunk": 1024,
+      "repeat": 2
+    },
+    {
+      "mode": "framewiener",
+      "rate": 204800,
+      "samples": 815104,
+      "wall_seconds": 0.0622908,
+      "cpu_seconds": 0.061705,
+      "cpu_percent": 1.54263,
+      "chunk": 1024,
+      "repeat": 2
+    },
+    {
+      "mode": "balanced",
+      "rate": 204800,
+      "samples": 815104,
+      "wall_seconds": 0.0843903,
+      "cpu_seconds": 0.083668,
+      "cpu_percent": 2.0917,
+      "chunk": 1024,
+      "repeat": 2
+    },
+    {
+      "mode": "reference",
+      "rate": 800000,
+      "samples": 3184000,
+      "wall_seconds": 0.420059,
+      "cpu_seconds": 0.418303,
+      "cpu_percent": 10.4576,
+      "chunk": 4000,
+      "repeat": 0
+    },
+    {
+      "mode": "wiener",
+      "rate": 800000,
+      "samples": 3184000,
+      "wall_seconds": 0.383753,
+      "cpu_seconds": 0.381413,
+      "cpu_percent": 9.53533,
+      "chunk": 4000,
+      "repeat": 0
+    },
+    {
+      "mode": "framewise",
+      "rate": 800000,
+      "samples": 3184000,
+      "wall_seconds": 0.362603,
+      "cpu_seconds": 0.360742,
+      "cpu_percent": 9.01855,
+      "chunk": 4000,
+      "repeat": 0
+    },
+    {
+      "mode": "framewiener",
+      "rate": 800000,
+      "samples": 3184000,
+      "wall_seconds": 0.328769,
+      "cpu_seconds": 0.326575,
+      "cpu_percent": 8.16438,
+      "chunk": 4000,
+      "repeat": 0
+    },
+    {
+      "mode": "balanced",
+      "rate": 800000,
+      "samples": 3184000,
+      "wall_seconds": 0.41679,
+      "cpu_seconds": 0.414846,
+      "cpu_percent": 10.3711,
+      "chunk": 4000,
+      "repeat": 0
+    },
+    {
+      "mode": "balanced",
+      "rate": 800000,
+      "samples": 3184000,
+      "wall_seconds": 0.422961,
+      "cpu_seconds": 0.420085,
+      "cpu_percent": 10.5021,
+      "chunk": 4000,
+      "repeat": 1
+    },
+    {
+      "mode": "framewiener",
+      "rate": 800000,
+      "samples": 3184000,
+      "wall_seconds": 0.330269,
+      "cpu_seconds": 0.328409,
+      "cpu_percent": 8.21023,
+      "chunk": 4000,
+      "repeat": 1
+    },
+    {
+      "mode": "framewise",
+      "rate": 800000,
+      "samples": 3184000,
+      "wall_seconds": 0.365245,
+      "cpu_seconds": 0.363573,
+      "cpu_percent": 9.08932,
+      "chunk": 4000,
+      "repeat": 1
+    },
+    {
+      "mode": "wiener",
+      "rate": 800000,
+      "samples": 3184000,
+      "wall_seconds": 0.397444,
+      "cpu_seconds": 0.387115,
+      "cpu_percent": 9.67788,
+      "chunk": 4000,
+      "repeat": 1
+    },
+    {
+      "mode": "reference",
+      "rate": 800000,
+      "samples": 3184000,
+      "wall_seconds": 0.4226,
+      "cpu_seconds": 0.419491,
+      "cpu_percent": 10.4873,
+      "chunk": 4000,
+      "repeat": 1
+    },
+    {
+      "mode": "reference",
+      "rate": 800000,
+      "samples": 3184000,
+      "wall_seconds": 0.426309,
+      "cpu_seconds": 0.42381,
+      "cpu_percent": 10.5952,
+      "chunk": 4000,
+      "repeat": 2
+    },
+    {
+      "mode": "wiener",
+      "rate": 800000,
+      "samples": 3184000,
+      "wall_seconds": 0.383066,
+      "cpu_seconds": 0.380846,
+      "cpu_percent": 9.52115,
+      "chunk": 4000,
+      "repeat": 2
+    },
+    {
+      "mode": "framewise",
+      "rate": 800000,
+      "samples": 3184000,
+      "wall_seconds": 0.367456,
+      "cpu_seconds": 0.365153,
+      "cpu_percent": 9.12882,
+      "chunk": 4000,
+      "repeat": 2
+    },
+    {
+      "mode": "framewiener",
+      "rate": 800000,
+      "samples": 3184000,
+      "wall_seconds": 0.328805,
+      "cpu_seconds": 0.326734,
+      "cpu_percent": 8.16835,
+      "chunk": 4000,
+      "repeat": 2
+    },
+    {
+      "mode": "balanced",
+      "rate": 800000,
+      "samples": 3184000,
+      "wall_seconds": 0.424826,
+      "cpu_seconds": 0.422184,
+      "cpu_percent": 10.5546,
+      "chunk": 4000,
+      "repeat": 2
+    },
+    {
+      "mode": "reference",
+      "rate": 800000,
+      "samples": 3184000,
+      "wall_seconds": 0.532323,
+      "cpu_seconds": 0.529144,
+      "cpu_percent": 13.2286,
+      "chunk": 1984,
+      "repeat": 0
+    },
+    {
+      "mode": "wiener",
+      "rate": 800000,
+      "samples": 3184000,
+      "wall_seconds": 0.492589,
+      "cpu_seconds": 0.488354,
+      "cpu_percent": 12.2089,
+      "chunk": 1984,
+      "repeat": 0
+    },
+    {
+      "mode": "framewise",
+      "rate": 800000,
+      "samples": 3184000,
+      "wall_seconds": 0.37275,
+      "cpu_seconds": 0.370474,
+      "cpu_percent": 9.26185,
+      "chunk": 1984,
+      "repeat": 0
+    },
+    {
+      "mode": "framewiener",
+      "rate": 800000,
+      "samples": 3184000,
+      "wall_seconds": 0.337012,
+      "cpu_seconds": 0.334271,
+      "cpu_percent": 8.35678,
+      "chunk": 1984,
+      "repeat": 0
+    },
+    {
+      "mode": "balanced",
+      "rate": 800000,
+      "samples": 3184000,
+      "wall_seconds": 0.526453,
+      "cpu_seconds": 0.523309,
+      "cpu_percent": 13.0827,
+      "chunk": 1984,
+      "repeat": 0
+    },
+    {
+      "mode": "balanced",
+      "rate": 800000,
+      "samples": 3184000,
+      "wall_seconds": 0.67649,
+      "cpu_seconds": 0.581842,
+      "cpu_percent": 14.5461,
+      "chunk": 1984,
+      "repeat": 1
+    },
+    {
+      "mode": "framewiener",
+      "rate": 800000,
+      "samples": 3184000,
+      "wall_seconds": 0.337141,
+      "cpu_seconds": 0.33335,
+      "cpu_percent": 8.33375,
+      "chunk": 1984,
+      "repeat": 1
+    },
+    {
+      "mode": "framewise",
+      "rate": 800000,
+      "samples": 3184000,
+      "wall_seconds": 0.373171,
+      "cpu_seconds": 0.371056,
+      "cpu_percent": 9.2764,
+      "chunk": 1984,
+      "repeat": 1
+    },
+    {
+      "mode": "wiener",
+      "rate": 800000,
+      "samples": 3184000,
+      "wall_seconds": 0.489911,
+      "cpu_seconds": 0.485507,
+      "cpu_percent": 12.1377,
+      "chunk": 1984,
+      "repeat": 1
+    },
+    {
+      "mode": "reference",
+      "rate": 800000,
+      "samples": 3184000,
+      "wall_seconds": 0.538533,
+      "cpu_seconds": 0.529305,
+      "cpu_percent": 13.2326,
+      "chunk": 1984,
+      "repeat": 1
+    },
+    {
+      "mode": "reference",
+      "rate": 800000,
+      "samples": 3184000,
+      "wall_seconds": 0.546296,
+      "cpu_seconds": 0.535157,
+      "cpu_percent": 13.3789,
+      "chunk": 1984,
+      "repeat": 2
+    },
+    {
+      "mode": "wiener",
+      "rate": 800000,
+      "samples": 3184000,
+      "wall_seconds": 0.511328,
+      "cpu_seconds": 0.499339,
+      "cpu_percent": 12.4835,
+      "chunk": 1984,
+      "repeat": 2
+    },
+    {
+      "mode": "framewise",
+      "rate": 800000,
+      "samples": 3184000,
+      "wall_seconds": 0.386239,
+      "cpu_seconds": 0.377053,
+      "cpu_percent": 9.42633,
+      "chunk": 1984,
+      "repeat": 2
+    },
+    {
+      "mode": "framewiener",
+      "rate": 800000,
+      "samples": 3184000,
+      "wall_seconds": 0.346957,
+      "cpu_seconds": 0.337915,
+      "cpu_percent": 8.44788,
+      "chunk": 1984,
+      "repeat": 2
+    },
+    {
+      "mode": "balanced",
+      "rate": 800000,
+      "samples": 3184000,
+      "wall_seconds": 0.529123,
+      "cpu_seconds": 0.524742,
+      "cpu_percent": 13.1185,
+      "chunk": 1984,
+      "repeat": 2
+    }
+  ],
+  "partitions": [
+    {
+      "mode": "reference",
+      "max_absolute_error": 0.4945182800292969,
+      "relative_rms_error": 0.49522191286087036
+    },
+    {
+      "mode": "framewise",
+      "max_absolute_error": 0.0,
+      "relative_rms_error": 0.0
+    },
+    {
+      "mode": "framewiener",
+      "max_absolute_error": 0.0,
+      "relative_rms_error": 0.0
+    }
+  ]
+}

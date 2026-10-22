@@ -12,6 +12,7 @@
 #include <atomic>
 #include <thread>
 #include <chrono>
+#include <cmath>
 
 #define CONCAT(a, b) ((std::string(a) + b).c_str())
 
@@ -28,6 +29,7 @@ ConfigManager config;
 class NullAudioSink : public SinkManager::Sink {
 public:
     std::atomic<int64_t> totalSamples{0};
+    std::atomic<int64_t> invalidSamples{0};
     std::atomic<float> currentSampleRate{48000.0f};
     std::string streamName;
 
@@ -47,6 +49,7 @@ public:
         if (running) { return; }
         currentSampleRate = _stream->getSampleRate();
         totalSamples = 0;
+        invalidSamples = 0;
         ns.start();
         running = true;
         flog::info("NullAudioSink started at {} Hz", (float)currentSampleRate);
@@ -77,13 +80,20 @@ private:
     class CountingNull : public dsp::Sink<dsp::stereo_t> {
     public:
         std::atomic<int64_t>* counter;
+        std::atomic<int64_t>* invalid;
         
-        CountingNull(std::atomic<int64_t>* counter) : counter(counter) {}
+        CountingNull(std::atomic<int64_t>* counter, std::atomic<int64_t>* invalid) : counter(counter), invalid(invalid) {}
         
         int run() override {
             int count = _in->read();
             if (count < 0) { return -1; }
             if (count > 0) {
+                int bad = 0;
+                for (int i = 0; i < count; ++i) {
+                    const auto& sample = _in->readBuf[i];
+                    if (!std::isfinite(sample.l) || !std::isfinite(sample.r)) ++bad;
+                }
+                *invalid += bad;
                 *counter += count;
             }
             _in->flush();
@@ -91,7 +101,7 @@ private:
         }
     };
 
-    CountingNull ns{&totalSamples};
+    CountingNull ns{&totalSamples, &invalidSamples};
     bool running = false;
 };
 
@@ -103,6 +113,9 @@ public:
         provider.ctx = this;
 
         sigpath::sinkManager.registerSinkProvider("NullAudioSink", provider);
+        httpdebug::procfs::registerEndpoint("/null_audio_sink/invalid_samples",
+            [this]() { return sink ? std::to_string(sink->invalidSamples.load()) : "0"; },
+            nullptr, httpdebug::procfs::Type::Int);
         
         // Register procfs endpoints for control and monitoring
         httpdebug::procfs::registerEndpoint("/null_audio_sink/samples", 
@@ -163,6 +176,7 @@ public:
 
     ~NullAudioSinkModule() {
         httpdebug::procfs::unregister("/null_audio_sink/samples");
+        httpdebug::procfs::unregister("/null_audio_sink/invalid_samples");
         httpdebug::procfs::unregister("/null_audio_sink/sample_rate");
         httpdebug::procfs::unregister("/null_audio_sink/status");
         httpdebug::procfs::unregister("/null_audio_sink/select");

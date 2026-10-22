@@ -1,0 +1,26 @@
+{
+  "version": "1.3.20",
+  "machine": "Apple M2 Max",
+  "regression_tests_passed": 9,
+  "abi_comparison_passed": true,
+  "bundle_signature_verified": true,
+  "qa_builds": {
+    "file-800k.json": "1.3.18, corrected PCM16 input",
+    "file-204k.json": "1.3.18, corrected PCM16 input",
+    "rf-performance.json": "1.3.19",
+    "rf-final.json": "1.3.20",
+    "persistence.json": "1.3.19"
+  },
+  "final_build_changes": "1.3.20 changes the bypass/off checkbox layout and version; DSP unchanged from 1.3.19",
+  "profile_json_files_unchanged_during_install": 106,
+  "private_plugin_binaries_unchanged_during_install": 10,
+  "normal_profile": "Receiving at saved 7.092 MHz LSB; 2D preference retained; Automatic voice resolved; Audio NR2 off",
+  "performance_limits": [
+    "Four-module isolated receiver; does not measure the full private plugin workload",
+    "NR UI percentage measures processing wall time; whole-process CPU uses ps CPU-time deltas",
+    "Short local intervals; dynamic display refresh and background load affect FPS/CPU",
+    "Early float-IQ files misread in PCM16 mode were discarded; reported File results use corrected PCM16"
+  ],
+  "listening_acceptance": "Oz compared Automatic with Original on voice and reported clearer audio with no distortion. This does not separately establish responsiveness, decoder gains or quality on other signals.",
+  "profiler": "Eight-second final-build Time Profiler capture; PID/path/module mapping and live vmmap load address verified; NR frames symbolicated. Raw trace remains private in /tmp/beige-mode-qa/release-rf.trace."
+}

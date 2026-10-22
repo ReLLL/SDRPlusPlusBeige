@@ -341,7 +341,8 @@ namespace dsp {
 //            std::cout << "sample: noisemu: " << sampleArr(params->noise_mu2) << std::endl;
             }
 
-            static ComplexArray logmmse_all(const ComplexArray &x, int Srate, float eta, SavedParamsC *params) {
+            static ComplexArray logmmse_all(const ComplexArray &x, int Srate, float eta, SavedParamsC *params,
+                    bool frameClock = false, bool wiener = false) {
                 int sz = x->size();
                 ALLOC_AND_CHECK(x, sz, "logmmse_all point -2.1")
                 static long long muSum[30] = {0,}, muCount = 0; auto ctm = currentTimeNanos();long long ctm2; auto statIndex = 0;
@@ -351,7 +352,7 @@ namespace dsp {
                 ALLOC_AND_CHECK(x, sz, "logmmse_all point -1.5")
                 ADD_STEP_STATS();
                 ALLOC_AND_CHECK(x, sz, "logmmse_all point -1.7")
-                params->update_noise_mu2(x);
+                if (!frameClock) params->update_noise_mu2(x);
                 // A silent capture has zero noise power. Keep both SNR
                 // divisions finite without altering ordinary RF noise floors.
                 npmaximum_(params->noise_mu2, 1e-20f);
@@ -360,6 +361,10 @@ namespace dsp {
                 auto xfinal = npzeros_c(Nframes * params->len2);
                 ALLOC_AND_CHECK(x, sz, "logmmse_all point 0")
                 for (int k = 0; k < Nframes * params->len2; k += params->len2) {
+                    if (frameClock) {
+                        params->update_noise_mu2(x);
+                        npmaximum_(params->noise_mu2, 1e-20f);
+                    }
                     ALLOC_AND_CHECK(x, sz, "logmmse_all point 1")
                     auto insign = muleach(params->win, nparange(x, k, k + params->Slen));
                     npfftfft(insign, params->forwardPlan);
@@ -392,11 +397,14 @@ namespace dsp {
                     ALLOC_AND_CHECK(x, sz, "logmmse_all point 10")
                     auto A = diveach(ksi, add(ksi, 1));
                     ALLOC_AND_CHECK(x, sz, "logmmse_all point 11")
-                    auto vk = muleach(A, gammak);
-                    ALLOC_AND_CHECK(x, sz, "logmmse_all point 12")
-                    auto ei_vk = mul(scipyspecialexpn(vk), 0.5);
-                    ALLOC_AND_CHECK(x, sz, "logmmse_all point 13")
-                    auto hw = muleach(A, npexp(ei_vk));
+                    auto hw = A;
+                    if (!wiener) {
+                        auto vk = muleach(A, gammak);
+                        ALLOC_AND_CHECK(x, sz, "logmmse_all point 12")
+                        auto ei_vk = mul(scipyspecialexpn(vk), 0.5);
+                        ALLOC_AND_CHECK(x, sz, "logmmse_all point 13")
+                        hw = muleach(A, npexp(ei_vk));
+                    }
                     ALLOC_AND_CHECK(x, sz, "logmmse_all point 14")
                     sig = muleach(sig, hw);
                     ALLOC_AND_CHECK(x, sz, "logmmse_all point 15")

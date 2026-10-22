@@ -1,0 +1,190 @@
+{
+  "performance": [
+    {
+      "profile": "original",
+      "view3d": "true",
+      "samples": 2781120,
+      "fps_median": 73.30749893188477,
+      "history_rows_median": 62.0,
+      "draw_us_median": 882.354,
+      "nr_cpu_median": 11.0,
+      "process_cpu_percent": 135.3448840384634
+    },
+    {
+      "profile": "auto",
+      "view3d": "true",
+      "samples": 3447840,
+      "fps_median": 76.0805549621582,
+      "history_rows_median": 63.0,
+      "draw_us_median": 896.4165,
+      "nr_cpu_median": 9.0,
+      "process_cpu_percent": 141.38312903121567
+    },
+    {
+      "profile": "auto",
+      "view3d": "false",
+      "samples": 2712480,
+      "fps_median": 76.90185546875,
+      "history_rows_median": 63.0,
+      "draw_us_median": 65.6255,
+      "nr_cpu_median": 11.0,
+      "process_cpu_percent": 131.6179551429934
+    },
+    {
+      "profile": "original",
+      "view3d": "true",
+      "samples": 2142240,
+      "fps_median": 74.05453872680664,
+      "history_rows_median": 62.0,
+      "draw_us_median": 1087.625,
+      "nr_cpu_median": 14.0,
+      "process_cpu_percent": 134.9798778019137
+    }
+  ],
+  "transitions": [
+    {
+      "repeat": 0,
+      "mode": "LSB",
+      "effective": "Wiener voice",
+      "samples": 123360
+    },
+    {
+      "repeat": 0,
+      "mode": "AM",
+      "effective": "Original LogMMSE",
+      "samples": 87840
+    },
+    {
+      "repeat": 0,
+      "mode": "CW",
+      "effective": "Original LogMMSE",
+      "samples": 101264
+    },
+    {
+      "repeat": 0,
+      "mode": "DSB",
+      "effective": "Original LogMMSE",
+      "samples": 123360
+    },
+    {
+      "repeat": 0,
+      "mode": "NFM",
+      "effective": "Bypassed",
+      "samples": 1827600
+    },
+    {
+      "repeat": 0,
+      "mode": "WFM",
+      "effective": "Bypassed",
+      "samples": 400320
+    },
+    {
+      "repeat": 0,
+      "mode": "RAW",
+      "effective": "Bypassed",
+      "samples": 2112240
+    },
+    {
+      "repeat": 0,
+      "mode": "USB",
+      "effective": "Wiener voice",
+      "samples": 176160
+    },
+    {
+      "repeat": 1,
+      "mode": "LSB",
+      "effective": "Wiener voice",
+      "samples": 161280
+    },
+    {
+      "repeat": 1,
+      "mode": "AM",
+      "effective": "Original LogMMSE",
+      "samples": 127680
+    },
+    {
+      "repeat": 1,
+      "mode": "CW",
+      "effective": "Original LogMMSE",
+      "samples": 140160
+    },
+    {
+      "repeat": 1,
+      "mode": "DSB",
+      "effective": "Original LogMMSE",
+      "samples": 154560
+    },
+    {
+      "repeat": 1,
+      "mode": "NFM",
+      "effective": "Bypassed",
+      "samples": 2010000
+    },
+    {
+      "repeat": 1,
+      "mode": "WFM",
+      "effective": "Bypassed",
+      "samples": 428160
+    },
+    {
+      "repeat": 1,
+      "mode": "RAW",
+      "effective": "Bypassed",
+      "samples": 1898640
+    },
+    {
+      "repeat": 1,
+      "mode": "USB",
+      "effective": "Wiener voice",
+      "samples": 188640
+    },
+    {
+      "repeat": 2,
+      "mode": "LSB",
+      "effective": "Wiener voice",
+      "samples": 199680
+    },
+    {
+      "repeat": 2,
+      "mode": "AM",
+      "effective": "Original LogMMSE",
+      "samples": 163200
+    },
+    {
+      "repeat": 2,
+      "mode": "CW",
+      "effective": "Original LogMMSE",
+      "samples": 161280
+    },
+    {
+      "repeat": 2,
+      "mode": "DSB",
+      "effective": "Original LogMMSE",
+      "samples": 167520
+    },
+    {
+      "repeat": 2,
+      "mode": "NFM",
+      "effective": "Bypassed",
+      "samples": 1966080
+    },
+    {
+      "repeat": 2,
+      "mode": "WFM",
+      "effective": "Bypassed",
+      "samples": 355919
+    },
+    {
+      "repeat": 2,
+      "mode": "RAW",
+      "effective": "Bypassed",
+      "samples": 1922400
+    },
+    {
+      "repeat": 2,
+      "mode": "USB",
+      "effective": "Wiener voice",
+      "samples": 173280
+    }
+  ]
+}

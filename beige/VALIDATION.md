@@ -10,6 +10,8 @@ Read when: verifying the spectrum renderer, imported plugins or a packaged build
 - `python3 -m py_compile beige/package_macos.py beige/import_brown.py beige/check_plugin_abi.py`.
 - Package, verify the complete signature and inspect dependency paths.
 
+Modulation-aware Baseband NR qualification and per-build evidence are in [BASEBAND-MODES.md](BASEBAND-MODES.md). Version 1.3.20 passes nine CTests, 48 File-source mode transitions across Apple/FFTW rates and eight final-build RTL-SDR mode transitions. Profile persistence, finite audio, bypass, public plugin ABI, package signature and normal-profile RF startup pass. Oz subsequently compared Automatic with Original on voice and confirmed clearer audio with no distortion; responsiveness was not separately confirmed in that answer.
+
 History tests cover newest-first order, live front updates, bounded retention, narrow-peak preservation, irregular gaps, clock reversal, invalid samples, small input widths and perspective direction.
 
 ## Runtime checks

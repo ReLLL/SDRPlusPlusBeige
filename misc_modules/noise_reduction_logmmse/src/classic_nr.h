@@ -19,6 +19,9 @@ public:
         params_.reset();
     }
 
+    // Algorithm changes retain learned noise, overlap and queued samples.
+    void setVoice(bool enabled) { voice_ = enabled; }
+
     void setAcceleration(bool preferApple) {
         params_.fftBackend = preferApple ? 1 : 0;
         if (!params_.Xk_prev) return;
@@ -47,7 +50,7 @@ public:
         const size_t maxSamples = size_t(maxFrames + 2) * params_.len2;
         auto work = pending_;
         if (work->size() > maxSamples) work = std::make_shared<std::vector<complex_t>>(pending_->begin(), pending_->begin() + maxSamples);
-        auto result = logmmse::LogMMSE::logmmse_all(work, rate_, 0.15f, &params_);
+        auto result = logmmse::LogMMSE::logmmse_all(work, rate_, 0.15f, &params_, voice_, voice_);
         for (size_t i = 0; i < result->size(); ++i) output[i] = (*result)[i] * 4.0f;
         pending_->erase(pending_->begin(), pending_->begin() + result->size());
         return int(result->size());
@@ -57,6 +60,7 @@ public:
 
 private:
     int rate_ = 192000;
+    bool voice_ = false;
     arrays::ComplexArray pending_;
     logmmse::LogMMSE::SavedParamsC params_;
 };

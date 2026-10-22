@@ -1,0 +1,42 @@
+[
+  {
+    "mode": "USB",
+    "method": "Wiener voice",
+    "audio_samples": 25440
+  },
+  {
+    "mode": "AM",
+    "method": "Original LogMMSE",
+    "audio_samples": 24960
+  },
+  {
+    "mode": "CW",
+    "method": "Original LogMMSE",
+    "audio_samples": 24960
+  },
+  {
+    "mode": "DSB",
+    "method": "Original LogMMSE",
+    "audio_samples": 25440
+  },
+  {
+    "mode": "0",
+    "method": "Bypassed",
+    "audio_samples": 25117
+  },
+  {
+    "mode": "WFM",
+    "method": "Bypassed",
+    "audio_samples": 25117
+  },
+  {
+    "mode": "RAW",
+    "method": "Bypassed",
+    "audio_samples": 24998
+  },
+  {
+    "mode": "LSB",
+    "method": "Wiener voice",
+    "audio_samples": 24960
+  }
+]

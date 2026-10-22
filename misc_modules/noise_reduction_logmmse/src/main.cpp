@@ -14,6 +14,7 @@
 #include <radio_interface.h>
 #include "if_nr.h"
 #include "af_nr.h"
+#include "baseband_mode.h"
 #include <http_debug_server.h>
 
 using namespace ImGui;
@@ -44,6 +45,10 @@ public:
         if (config.conf.contains("DisableCpuDeactivation")) disableCpuDeactivation = config.conf["DisableCpuDeactivation"];
         if (config.conf.contains("SNRChartWidget")) snrChartWidget = config.conf["SNRChartWidget"];
         if (config.conf.contains("BasebandAcceleration")) acceleration = config.conf["BasebandAcceleration"];
+        if (config.conf.contains("BasebandProfile") && config.conf["BasebandProfile"].is_number_integer()) {
+            const auto& saved = config.conf["BasebandProfile"];
+            if (saved >= 0 && saved <= 2) profile = saved.get<int>();
+        }
         config.release(true);
 
         ifnrProcessor.setDisableCpuDeactivation(disableCpuDeactivation);
@@ -51,10 +56,10 @@ public:
 
         gui::menu.registerEntry(name, menuHandler, this, NULL);
         updateBindings();
-        actuateIFNR();
+        refreshBasebandMode();
 
         std::string path = "/modules/noise_reduction_logmmse/" + name;
-        httpdebug::procfs::registerEndpoint(path + "/baseband_nr", [&]() { return ifnr ? "true" : "false"; }, [&](const std::string& v) { ifnr = (v == "true" || v == "1"); actuateIFNR(); }, httpdebug::procfs::Type::Bool);
+        httpdebug::procfs::registerEndpoint(path + "/baseband_nr", [&]() { return ifnr ? "true" : "false"; }, [&](const std::string& v) { ifnr = (v == "true" || v == "1"); refreshBasebandMode(); }, httpdebug::procfs::Type::Bool);
         httpdebug::procfs::registerEndpoint(path + "/snr_chart", [&]() { return snrChartWidget ? "true" : "false"; }, [&](const std::string& v) { snrChartWidget = (v == "true" || v == "1"); }, httpdebug::procfs::Type::Bool);
         httpdebug::procfs::registerEndpoint(path + "/cpu_usage", [&]() { return std::to_string(ifnrProcessor.percentUsage.load()); }, nullptr, httpdebug::procfs::Type::Int);
         httpdebug::procfs::registerEndpoint(path + "/acceleration", [&]() { return acceleration ? "true" : "false"; }, [&](const std::string& v) {
@@ -62,6 +67,13 @@ public:
             ifnrProcessor.setAcceleration(acceleration);
         }, httpdebug::procfs::Type::Bool);
         httpdebug::procfs::registerEndpoint(path + "/backend", [&]() { return ifnrProcessor.usesApple() ? "Apple Accelerate" : "FFTW"; }, nullptr, httpdebug::procfs::Type::String);
+        httpdebug::procfs::registerEndpoint(path + "/profile", [&]() { return std::string(profileName()); }, [&](const std::string& v) {
+            if (v == "auto") setProfile(0);
+            else if (v == "original") setProfile(1);
+            else if (v == "digital") setProfile(2);
+        }, httpdebug::procfs::Type::String);
+        httpdebug::procfs::registerEndpoint(path + "/effective", [&]() { return dsp::baseband::label(effective.load()); }, nullptr, httpdebug::procfs::Type::String);
+        httpdebug::procfs::registerEndpoint(path + "/selected_mode", [&]() { return dsp::baseband::modeLabel(selectedMode.load()); }, nullptr, httpdebug::procfs::Type::String);
     }
 
     ~NRModule() {
@@ -71,18 +83,21 @@ public:
         httpdebug::procfs::unregister(path + "/cpu_usage");
         httpdebug::procfs::unregister(path + "/acceleration");
         httpdebug::procfs::unregister(path + "/backend");
+        httpdebug::procfs::unregister(path + "/profile");
+        httpdebug::procfs::unregister(path + "/effective");
+        httpdebug::procfs::unregister(path + "/selected_mode");
         if (enabled) { enabled = false; updateBindings(); }
         gui::menu.removeEntry(name);
     }
 
-    void postInit() {}
+    void postInit() { refreshBasebandMode(); }
 
     void enable() {
         if (!enabled) {
             enabled = true;
             ifnrProcessor.setDisableCpuDeactivation(disableCpuDeactivation);
             updateBindings();
-            actuateIFNR();
+            refreshBasebandMode();
         }
     }
 
@@ -103,6 +118,41 @@ private:
     bool ifnr = false;
     bool disableCpuDeactivation = false;
     bool acceleration = true;
+    std::atomic<int> profile{0}, selectedMode{-1};
+    std::atomic<dsp::baseband::Algorithm> effective{dsp::baseband::Algorithm::Original};
+
+    const char* profileName() const {
+        switch (profile.load()) {
+            case 1: return "original";
+            case 2: return "digital";
+            default: return "auto";
+        }
+    }
+
+    void setProfile(int value) {
+        profile = value;
+        config.acquire();
+        config.conf["BasebandProfile"] = value;
+        config.release(true);
+        refreshBasebandMode();
+    }
+
+    void refreshBasebandMode() {
+        std::vector<int> modes;
+        int selected = -1;
+        for (const auto& radio : core::modComManager.findInterfaces("radio")) {
+            if (!sigpath::vfoManager.vfoExists(radio)) continue;
+            int mode = -1;
+            core::modComManager.callInterface(radio, RADIO_IFACE_CMD_GET_MODE, nullptr, &mode);
+            modes.push_back(mode);
+            if (radio == gui::waterfall.selectedVFO) selected = mode;
+        }
+        selectedMode = selected;
+        const auto algorithm = dsp::baseband::select(static_cast<dsp::baseband::Profile>(profile.load()), selected, modes);
+        effective = algorithm;
+        ifnrProcessor.setVoice(algorithm == dsp::baseband::Algorithm::Voice);
+        actuateIFNR();
+    }
 
     bool afnrEnabled = false;
     bool snrChartWidget = false;
@@ -158,6 +208,7 @@ private:
             waterfallDrawnHandler.ctx = this;
             waterfallDrawnHandler.handler = [](ImGuiContext* gctx, void* ctx) {
                 NRModule* _this = (NRModule*)ctx;
+                _this->refreshBasebandMode();
                 _this->drawSNRMeterAverages(gctx);
             };
             ImGui::onSNRMeterExtPoint.bindHandler(&snrMeterExtPointHandler);
@@ -242,7 +293,7 @@ private:
     }
 
     void actuateIFNR() {
-        bool shouldRun = enabled && ifnr;
+        bool shouldRun = enabled && ifnr && effective.load() != dsp::baseband::Algorithm::Bypass;
         if (ifnrProcessor.bypass != !shouldRun) {
             ifnrProcessor.bypass = !shouldRun;
             sigpath::iqFrontEnd.togglePreprocessor(&ifnrProcessor, shouldRun);
@@ -256,9 +307,8 @@ private:
             config.acquire();
             config.conf["IFNR"] = ifnr;
             config.release(true);
-            actuateIFNR();
+            refreshBasebandMode();
         }
-        ImGui::SameLine();
         if (ifnrProcessor.stoppedForCpu() && ifnr) {
             ifnr = false;
             config.acquire();
@@ -267,6 +317,7 @@ private:
             actuateIFNR();
         }
         if (ifnrProcessor.stoppedForCpu()) {
+            ImGui::SameLine();
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0, 0, 1.0f));
             ImGui::TextUnformatted("Slow CPU. Reduce sample rate.");
             ImGui::PopStyleColor(1);
@@ -274,6 +325,7 @@ private:
         else {
             // show cpu usage
             if (ifnrProcessor.percentUsage >= 0) {
+                ImGui::SameLine();
                 if (ifnrProcessor.percentUsage > 80) {
                     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0, 0, 1.0f));
                 }
@@ -310,6 +362,13 @@ private:
             ImGui::SetTooltip("Use Apple Accelerate FFTs for supported lengths.\nAutomatically falls back to FFTW. Disable to use FFTW directly.");
         }
 #endif
+        int choice = profile.load();
+        ImGui::SetNextItemWidth(menuWidth);
+        if (ImGui::Combo("##baseband_profile", &choice, "Automatic (mode)\0Original LogMMSE\0Digital / bypass\0")) setProfile(choice);
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Automatic: Wiener for USB/LSB voice; original for AM/CW/DSB.\nFM/RAW bypasses NR. Mixed VFOs use the safer shared setting.\nFor digital signals carried in USB/LSB, select Digital / bypass.\nOriginal LogMMSE restores the accepted method.");
+        }
+        if (ifnr) ImGui::TextDisabled("%s: %s", dsp::baseband::modeLabel(selectedMode.load()), dsp::baseband::label(effective.load()));
         if (ifnr && ifnrProcessor.percentUsage.load() >= 0) {
             ImGui::TextDisabled("Math: %s", ifnrProcessor.usesApple() ? "Apple Accelerate" : "FFTW");
         }

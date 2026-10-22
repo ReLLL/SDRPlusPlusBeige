@@ -1,0 +1,45 @@
+{
+  "performance": [
+    {
+      "profile": "original",
+      "view3d": "true",
+      "samples": 328800,
+      "fps_median": 73.40227127075195,
+      "history_rows_median": 51.0,
+      "draw_us_median": 297.0,
+      "nr_cpu_median": 20.0,
+      "process_cpu_percent": 41.31400360519065
+    },
+    {
+      "profile": "auto",
+      "view3d": "true",
+      "samples": 326400,
+      "fps_median": 74.02798843383789,
+      "history_rows_median": 50.0,
+      "draw_us_median": 284.438,
+      "nr_cpu_median": 13.0,
+      "process_cpu_percent": 34.662948094378535
+    },
+    {
+      "profile": "auto",
+      "view3d": "false",
+      "samples": 327840,
+      "fps_median": 72.31664657592773,
+      "history_rows_median": 49.0,
+      "draw_us_median": 72.458,
+      "nr_cpu_median": 13.0,
+      "process_cpu_percent": 31.445605548087567
+    },
+    {
+      "profile": "original",
+      "view3d": "true",
+      "samples": 326400,
+      "fps_median": 74.34856796264648,
+      "history_rows_median": 49.0,
+      "draw_us_median": 240.875,
+      "nr_cpu_median": 19.5,
+      "process_cpu_percent": 38.967982675068654
+    }
+  ],
+  "transitions": []
+}

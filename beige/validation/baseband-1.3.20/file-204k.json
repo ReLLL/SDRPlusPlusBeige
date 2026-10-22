@@ -1,0 +1,149 @@
+{
+  "performance": [],
+  "transitions": [
+    {
+      "repeat": 0,
+      "mode": "LSB",
+      "effective": "Wiener voice",
+      "samples": 674880
+    },
+    {
+      "repeat": 0,
+      "mode": "AM",
+      "effective": "Original LogMMSE",
+      "samples": 483840
+    },
+    {
+      "repeat": 0,
+      "mode": "CW",
+      "effective": "Original LogMMSE",
+      "samples": 354720
+    },
+    {
+      "repeat": 0,
+      "mode": "DSB",
+      "effective": "Original LogMMSE",
+      "samples": 249120
+    },
+    {
+      "repeat": 0,
+      "mode": "NFM",
+      "effective": "Bypassed",
+      "samples": 663120
+    },
+    {
+      "repeat": 0,
+      "mode": "WFM",
+      "effective": "Bypassed",
+      "samples": 150240
+    },
+    {
+      "repeat": 0,
+      "mode": "RAW",
+      "effective": "Bypassed",
+      "samples": 667200
+    },
+    {
+      "repeat": 0,
+      "mode": "USB",
+      "effective": "Wiener voice",
+      "samples": 497280
+    },
+    {
+      "repeat": 1,
+      "mode": "LSB",
+      "effective": "Wiener voice",
+      "samples": 606720
+    },
+    {
+      "repeat": 1,
+      "mode": "AM",
+      "effective": "Original LogMMSE",
+      "samples": 542880
+    },
+    {
+      "repeat": 1,
+      "mode": "CW",
+      "effective": "Original LogMMSE",
+      "samples": 524160
+    },
+    {
+      "repeat": 1,
+      "mode": "DSB",
+      "effective": "Original LogMMSE",
+      "samples": 480000
+    },
+    {
+      "repeat": 1,
+      "mode": "NFM",
+      "effective": "Bypassed",
+      "samples": 1814880
+    },
+    {
+      "repeat": 1,
+      "mode": "WFM",
+      "effective": "Bypassed",
+      "samples": 351601
+    },
+    {
+      "repeat": 1,
+      "mode": "RAW",
+      "effective": "Bypassed",
+      "samples": 897600
+    },
+    {
+      "repeat": 1,
+      "mode": "USB",
+      "effective": "Wiener voice",
+      "samples": 494880
+    },
+    {
+      "repeat": 2,
+      "mode": "LSB",
+      "effective": "Wiener voice",
+      "samples": 500160
+    },
+    {
+      "repeat": 2,
+      "mode": "AM",
+      "effective": "Original LogMMSE",
+      "samples": 406560
+    },
+    {
+      "repeat": 2,
+      "mode": "CW",
+      "effective": "Original LogMMSE",
+      "samples": 350880
+    },
+    {
+      "repeat": 2,
+      "mode": "DSB",
+      "effective": "Original LogMMSE",
+      "samples": 335520
+    },
+    {
+      "repeat": 2,
+      "mode": "NFM",
+      "effective": "Bypassed",
+      "samples": 1016880
+    },
+    {
+      "repeat": 2,
+      "mode": "WFM",
+      "effective": "Bypassed",
+      "samples": 190560
+    },
+    {
+      "repeat": 2,
+      "mode": "RAW",
+      "effective": "Bypassed",
+      "samples": 459840
+    },
+    {
+      "repeat": 2,
+      "mode": "USB",
+      "effective": "Wiener voice",
+      "samples": 317760
+    }
+  ]
+}

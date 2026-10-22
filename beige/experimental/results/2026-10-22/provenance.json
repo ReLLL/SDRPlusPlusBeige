@@ -1,0 +1,127 @@
+{
+  "baseline_commit": "cebefb0c12b593c0e6d61f2fea0328096b51477d",
+  "platform": "macOS-26.6.2-arm64-arm-64bit",
+  "python": "3.11.4",
+  "packages": {
+    "numpy": "2.2.6",
+    "scipy": "1.13.1",
+    "soundfile": "0.13.0",
+    "pystoi": "0.4.1"
+  },
+  "cpu": "Apple M2 Max",
+  "source_sha256": {
+    "nr_lab.cpp": "d31dac9abfb95ae38a7628a1584b15718c99d5829e5390d28d5a683e5a536fa1",
+    "nr_lab_checks.h": "3bd6d4775904238c9776fdc7afc33581847b58733fd1a385824927b27af67eb8",
+    "logmmse_variants.h": "4fc851cec99ac5a2ed163fda3512a44e4044de72ee0fe6f04a1acb4e5a5fb44d",
+    "nr_evaluate.py": "a9f1a2d2f12dcfc849f607c5bd578ad33e37373e53b8c2abdfd3890aa33c9a58",
+    "nr_guardrails.py": "a6becc4d28e891c7dd602814f1388b1067caf2327703ea7c80910c9bae805cd0",
+    "nr_benchmark.py": "2c7e1732369023820fcef8ca1fa5e3230e082eedd739cc482707fb1bd899bea0",
+    "nr_summarize.py": "ba6a357875f4836e1ecf85f0842f3320511cb69e092bd3e9f445e0fa17c98c7a",
+    "nr_listening.py": "6ed977ba96b5d8d9b6c73f4f1e365d668af1362aa17b3f07d153e8c21f5cac08"
+  },
+  "input_download": {
+    "source": "Open Speech Repository",
+    "download_mirror": "https://raw.githubusercontent.com/hrtlacek/td_mfcc/master/OSR_us_000_0010_8k.wav",
+    "sha256": "a4bf9becd046d7aedb6d05b6e12347a6294a44f74d263089c636fb0a2b1e6561",
+    "reason": "Original host returned HTTP 406"
+  },
+  "suites": {
+    "development-a": {
+      "speech_source": "https://www.voiptroubleshooter.com/open_speech/american.html",
+      "rate": 204800,
+      "seconds": 8,
+      "holdout": false,
+      "modes": [
+        "reference",
+        "cap",
+        "fast",
+        "smooth",
+        "bias",
+        "bootstrap",
+        "tracker",
+        "blend95",
+        "blend85"
+      ],
+      "speech_sha256": {
+        "OSR_us_000_0010_8k.wav": "a4bf9becd046d7aedb6d05b6e12347a6294a44f74d263089c636fb0a2b1e6561",
+        "speech-male.aiff": "0f560f0411e7a33f86fc31117b1ba8ab451da51c51de93cffa8cfa05ac48d326"
+      }
+    },
+    "development-b": {
+      "speech_source": "https://www.voiptroubleshooter.com/open_speech/american.html",
+      "rate": 204800,
+      "seconds": 8,
+      "holdout": false,
+      "modes": [
+        "reference",
+        "gh",
+        "wiener",
+        "sqrtwiener"
+      ],
+      "speech_sha256": {
+        "OSR_us_000_0010_8k.wav": "a4bf9becd046d7aedb6d05b6e12347a6294a44f74d263089c636fb0a2b1e6561",
+        "speech-male.aiff": "0f560f0411e7a33f86fc31117b1ba8ab451da51c51de93cffa8cfa05ac48d326"
+      }
+    },
+    "development-c": {
+      "speech_source": "https://www.voiptroubleshooter.com/open_speech/american.html",
+      "rate": 204800,
+      "seconds": 8,
+      "holdout": false,
+      "modes": [
+        "reference",
+        "framewise",
+        "balanced"
+      ],
+      "chunk": 1024,
+      "speech_sha256": {
+        "OSR_us_000_0010_8k.wav": "a4bf9becd046d7aedb6d05b6e12347a6294a44f74d263089c636fb0a2b1e6561",
+        "speech-male.aiff": "0f560f0411e7a33f86fc31117b1ba8ab451da51c51de93cffa8cfa05ac48d326"
+      }
+    },
+    "holdout": {
+      "speech_source": "https://www.voiptroubleshooter.com/open_speech/american.html",
+      "rate": 204800,
+      "seconds": 8,
+      "holdout": true,
+      "modes": [
+        "reference",
+        "wiener",
+        "framewise",
+        "framewiener",
+        "balanced"
+      ],
+      "chunk": 1024,
+      "speech_sha256": {
+        "OSR_us_000_0010_8k.wav": "a4bf9becd046d7aedb6d05b6e12347a6294a44f74d263089c636fb0a2b1e6561",
+        "speech.aiff": "8b1329b81ca691fce6bdda9ca7b6c45caf6c3a6ec9b3eb18a8c9214ac0e5b997"
+      }
+    },
+    "holdout-800k": {
+      "speech_source": "https://www.voiptroubleshooter.com/open_speech/american.html",
+      "rate": 800000,
+      "seconds": 8,
+      "holdout": true,
+      "modes": [
+        "reference",
+        "wiener",
+        "framewise",
+        "framewiener",
+        "balanced"
+      ],
+      "chunk": 4000,
+      "speech_sha256": {
+        "OSR_us_000_0010_8k.wav": "a4bf9becd046d7aedb6d05b6e12347a6294a44f74d263089c636fb0a2b1e6561",
+        "speech.aiff": "8b1329b81ca691fce6bdda9ca7b6c45caf6c3a6ec9b3eb18a8c9214ac0e5b997"
+      }
+    }
+  },
+  "research_dependency": "pystoi==0.4.1 (MIT), evaluation only; numpy/scipy/soundfile from host",
+  "installed_app_changed": false,
+  "limitations": [
+    "One human speaker; two synthetic voices; synthetic RF/noise, no RF capture",
+    "eSTOI/STOI are reference metrics, not QSO word accuracy or listening approval",
+    "No decoder or GUI frame-rate qualification for a new production reducer",
+    "Initial pilot with an incorrectly ignored gain-cap return value was discarded"
+  ]
+}

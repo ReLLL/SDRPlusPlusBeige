@@ -19,6 +19,7 @@ public:
     void setHold(bool value) { hold_.store(value); }
     void setDisableCpuDeactivation(bool value) { disableCpuDeactivation_.store(value); }
     void setAcceleration(bool enabled) { preferApple_.store(enabled); }
+    void setVoice(bool enabled) { voice_.store(enabled); }
     void reset() { shouldReset_.store(true); }
     bool usesApple() const { return usesApple_.load(); }
     bool stoppedForCpu() const { return cpuStop_.load(); }
@@ -37,6 +38,7 @@ public:
             configuredApple_ = apple;
         }
         if (shouldReset_.exchange(false)) engine_.reset();
+        engine_.setVoice(voice_.load());
         const int written = engine_.process(in, count, out, hold_.load());
         usesApple_.store(engine_.usesApple());
         return written;
@@ -97,6 +99,7 @@ protected:
 private:
     ClassicNR engine_;
     std::atomic<bool> shouldReset_{true}, hold_{false}, preferApple_{true}, usesApple_{false};
+    std::atomic<bool> voice_{false};
     std::atomic<bool> disableCpuDeactivation_{false}, cpuStop_{false};
     int rate_ = 0, previousUsage_ = 0;
     double cpuSeconds_ = 0, audioSeconds_ = 0;

@@ -8,7 +8,19 @@ Oz prioritizes NR quality, clean audio, low CPU usage and high UI/waterfall fram
 
 Close all Beige instances when testing is finished unless Oz explicitly requests leaving the receiver open.
 
-## Current receiver: 1.3.17
+## October 22 algorithm research
+
+[Offline research and reproducible results](experimental/NR-RESEARCH.md) compare fourteen LogMMSE variants on controlled speech IQ plus CW/AM/BPSK checks. Frame-clock/Wiener improved held-out mean eSTOI by 0.0165 at 800 kS/s, repeating the 0.0166 gain at 204.8 kS/s. Measured NR CPU fell from 13.23% to 8.36% of one M2 Max core at 800 kS/s with 1,984-sample packets. A packet-size-dependent noise-update clock was reproduced; frame-based updates eliminate that difference in the tests. The research preceded 1.3.20, which now offers this candidate for SSB voice after the receiver checks below. Other variants remain experimental. No live listening approval or digital-decoder gain is claimed.
+
+## Current receiver: 1.3.20
+
+[Modulation-aware Baseband NR](BASEBAND-MODES.md) adds Automatic (mode), Original LogMMSE and Digital / bypass. Automatic uses the measured frame-clock/Wiener path for USB/LSB voice, keeps Original for AM/CW/DSB, and bypasses FM/raw. Shared radio VFOs use the safer common setting. USB/LSB digital payloads require Digital / bypass; modulation alone cannot identify them. The existing Baseband NR enabled state and optional math setting are preserved. Original remains the immediate fallback.
+
+The final build passes nine CTests, the Brown ABI comparison and bundle signature verification. Corrected recorded-IQ tests pass 48 radio-mode changes across FFTW/Apple rates; eight additional mode changes pass on real RTL-SDR input in the final build. No invalid audio samples were counted. On the isolated live 800 kS/s receiver, 3D whole-process CPU was 39-41% of one core with Original and 34.7% with Automatic, at about 74 FPS in both. These measurements exclude the normal private plugin workload. [Measurements and qualification limits](validation/baseband-1.3.20/verification.json).
+
+Installation preserves all 106 JSON files under the private profile and ten private plugin binaries byte-for-byte during replacement. Normal RF resumes at the saved 7.092 MHz LSB tune with the selected 2D view retained. Oz's subsequent Automatic versus Original voice comparison found clearer audio with no distortion. The existing combobox provides live comparison; acceleration remains an independent checkbox. No separate toggle was requested after Oz noticed the combobox.
+
+## Accepted baseline and earlier regression
 
 Oz reported that the replacement Baseband NR in 1.3.15 sounded distorted and looked slower. Its synthetic improvements did not qualify its live sound. Version 1.3.16 restores the established LOGMMSE algorithm, noise estimation, overlap behavior, startup capture and original 4x output level. The new attenuation slider is removed. The replacement engine is retained only under `beige/experimental/` for research and is not included by the production module.
 
