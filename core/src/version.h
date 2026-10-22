@@ -1,4 +1,4 @@
 #pragma once
 
-#define VERSION_STR "1.3.33-beige"
-#define BEIGE_BUILD_NUMBER 33
+#define VERSION_STR "1.3.34-beige"
+#define BEIGE_BUILD_NUMBER 34

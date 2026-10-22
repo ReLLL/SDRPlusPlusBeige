@@ -1,5 +1,11 @@
 # Beige validation
 
+## Rewind shortcuts and listening acceptance (October 22, 1.3.34)
+
+Oz confirmed "Works well" on installed 1.3.33 when asked whether -10s replay preserves voice clarity and returns cleanly to Live. This supersedes the pending listening status below for those behaviors.
+
+Version 1.3.34 adds -3s, -5s and -30s beside -10s, with timeline/save wrapping at narrow widths. Native mouse tests verify each new step from the current position, existing ten-second rewind and layouts at 900/1120/1400 pixels. Native compact-menu Save 60s and direct Save 30s create valid stereo float WAV sound files. Packaged export tests repeat exact 30/60-second overlap, finite audio, failed-save recovery and transport checks. All 24 CTests, ABI, build and signatures pass. Installed normal-profile startup preserves 137 checked settings/plugin/resource files, and the app closes after testing. The accepted audio processing and history engine are unchanged. Private evidence: `/tmp/beige-audio-rewind-20261022/native-buttons-34.json`, `buttons-export-smoke.log`, `build-1.3.34.log` and `install-1.3.34.json`.
+
 ## Audio rewind and spectrum-edge crash (October 22, 1.3.33)
 
 Desktop rewind retains 60 seconds of the selected listening output, with ten-second rewind, pause/resume, a timeline, Live and background Save 30s/60s. Native mouse checks cover the wide layout and the compact Save menu at 1120 pixels. At 48 kHz, retained stereo storage is 24,960,000 bytes; disabling the feature releases it. Existing RF, decoder and Recorder branches remain live. Accepted NR algorithms and settings are unchanged. See [AUDIO-REWIND.md](AUDIO-REWIND.md) for signal ownership, export semantics and performance limits.

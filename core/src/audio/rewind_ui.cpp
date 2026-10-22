@@ -8,7 +8,11 @@ namespace {
 void tip(const char* text) { if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", text); }
 }
 
-float barHeight() { return ImGui::GetFrameHeight() + ImGui::GetTextLineHeightWithSpacing() + 12 * style::uiScale; }
+float barHeight() {
+    const bool split = ImGui::GetContentRegionAvail().x < 700 * style::uiScale;
+    return ImGui::GetFrameHeight() + ImGui::GetTextLineHeightWithSpacing() + 12 * style::uiScale
+        + (split ? ImGui::GetFrameHeight() + 3 * style::uiScale : 0);
+}
 
 void draw(const std::string& streamName, bool receiving) {
     select(streamName);
@@ -16,6 +20,7 @@ void draw(const std::string& streamName, bool receiving) {
     const auto s = state();
     const auto e = exportState();
     const float width = ImGui::GetContentRegionAvail().x;
+    const bool split = width < 700 * style::uiScale;
     const bool roomy = width > 850 * style::uiScale;
     ImGui::PushID("beige_audio_rewind");
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(6 * style::uiScale, 3 * style::uiScale));
@@ -25,9 +30,12 @@ void draw(const std::string& streamName, bool receiving) {
     ImGui::SameLine();
     const bool hasAudio = on && s.available > .05;
     if (!hasAudio) ImGui::BeginDisabled();
-    if (ImGui::Button("-10s", ImVec2(46 * style::uiScale, 0))) { seek(s.delay + 10); pause(false); }
-    tip("Listen again from ten seconds earlier. Reception continues.");
-    ImGui::SameLine();
+    const struct { const char* label; int seconds; } steps[] = {{"-3s", 3}, {"-5s", 5}, {"-10s", 10}, {"-30s", 30}};
+    for (const auto& step : steps) {
+        if (ImGui::Button(step.label, ImVec2(46 * style::uiScale, 0))) { seek(s.delay + step.seconds); pause(false); }
+        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Rewind %d seconds from the current position.\nReception continues; limited to available history.", step.seconds);
+        ImGui::SameLine();
+    }
     if (ImGui::Button(s.paused ? "Play###pause" : "Pause###pause", ImVec2(58 * style::uiScale, 0))) pause(!s.paused);
     tip("Pause or resume audio. Incoming audio continues filling the history.\nThe oldest audio expires after 60 seconds, including while paused.");
     ImGui::SameLine();
@@ -36,7 +44,7 @@ void draw(const std::string& streamName, bool receiving) {
     if (ImGui::Button("Live", ImVec2(42 * style::uiScale, 0))) live();
     ImGui::PopStyleColor();
     tip("Return immediately to live audio.");
-    ImGui::SameLine();
+    if (!split) ImGui::SameLine();
     float position = -float(s.delay);
     const float reserve = (roomy ? 228 : 142) * style::uiScale;
     ImGui::SetNextItemWidth(std::max(55 * style::uiScale, ImGui::GetContentRegionAvail().x - reserve));
