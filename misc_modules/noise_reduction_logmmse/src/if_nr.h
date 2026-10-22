@@ -2,7 +2,7 @@
 #include <dsp/processor.h>
 #include <atomic>
 #include <chrono>
-#include "adaptive_nr.h"
+#include "classic_nr.h"
 
 namespace dsp {
 
@@ -18,26 +18,28 @@ public:
 
     void setHold(bool value) { hold_.store(value); }
     void setDisableCpuDeactivation(bool value) { disableCpuDeactivation_.store(value); }
-    void setReduction(float db) { reduction_.store(std::clamp(db, 0.0f, 24.0f)); }
     void setAcceleration(bool enabled) { preferApple_.store(enabled); }
     void reset() { shouldReset_.store(true); }
     bool usesApple() const { return usesApple_.load(); }
-    int latencySamples() const { return latency_.load(); }
     bool stoppedForCpu() const { return cpuStop_.load(); }
 
-    void process(const complex_t* in, int count, complex_t* out, int sampleRate) {
+    int process(const complex_t* in, int count, complex_t* out, int sampleRate) {
         const bool apple = preferApple_.load();
-        if (sampleRate != rate_ || apple != configuredApple_) {
+        if (sampleRate != rate_) {
             engine_.configure(sampleRate, apple);
             rate_ = sampleRate;
             configuredApple_ = apple;
             usesApple_.store(engine_.usesApple());
-            latency_.store(engine_.latency());
             shouldReset_.store(false);
         }
+        if (apple != configuredApple_) {
+            engine_.setAcceleration(apple);
+            configuredApple_ = apple;
+        }
         if (shouldReset_.exchange(false)) engine_.reset();
-        engine_.setReduction(reduction_.load());
-        engine_.process(in, count, out, hold_.load());
+        const int written = engine_.process(in, count, out, hold_.load());
+        usesApple_.store(engine_.usesApple());
+        return written;
     }
 
     int run() override {
@@ -45,11 +47,11 @@ public:
         if (count < 0) return -1;
         const int rate = (std::max)(1, int(sigpath::iqFrontEnd.getSampleRate()));
         const auto begin = std::chrono::steady_clock::now();
-        process(_in->readBuf, count, out.writeBuf, rate);
+        const int written = process(_in->readBuf, count, out.writeBuf, rate);
         cpuSeconds_ += std::chrono::duration<double>(std::chrono::steady_clock::now() - begin).count();
         audioSeconds_ += double(count) / rate;
         _in->flush();
-        if (!out.swap(count)) return -1;
+        if (written > 0 && !out.swap(written)) return -1;
         if (audioSeconds_ >= 0.4) {
             const int usage = int(100 * cpuSeconds_ / audioSeconds_);
             percentUsage.store(usage);
@@ -93,11 +95,9 @@ protected:
     }
 
 private:
-    AdaptiveNR engine_;
+    ClassicNR engine_;
     std::atomic<bool> shouldReset_{true}, hold_{false}, preferApple_{true}, usesApple_{false};
     std::atomic<bool> disableCpuDeactivation_{false}, cpuStop_{false};
-    std::atomic<float> reduction_{12};
-    std::atomic<int> latency_{0};
     int rate_ = 0, previousUsage_ = 0;
     double cpuSeconds_ = 0, audioSeconds_ = 0;
     bool configuredApple_ = true, txBound_ = false;

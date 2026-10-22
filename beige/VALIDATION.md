@@ -70,6 +70,8 @@ The full package passed all three CTest checks, the plugin ABI comparison, build
 
 ## Baseband NR and Apple math (October 22)
 
+Oz rejected this 1.3.15 replacement in live use: he reported worse/distorted audio and a slower appearance. The synthetic results below are not acceptance evidence for its sound quality. See the correction record after this section.
+
 Installed 1.3.15 includes the adaptive IQ denoiser, 0-24 dB reduction control and optional Apple Accelerate backend described in [NOISE-REDUCTION.md](NOISE-REDUCTION.md). The final build passed all six CTest checks, including the independent AddressSanitizer path and a numerical target linked only to FFTW with Apple code compiled out. The public plugin ABI comparison, Python compilation, whitespace and full bundle signature checks passed.
 
 Controlled weak-SSB measurements inside the actual 300-3000 Hz USB passband show 5.58 dB less reconstruction error at the 12 dB default. Strong/clean modulation fixtures include SSB, AM, narrow FM, BPSK and CW. These synthetic results do not establish live speech intelligibility or decoder success rates. Detailed strength tradeoffs, legacy comparisons and benchmark limits are in the linked document.
@@ -78,4 +80,36 @@ Controlled weak-SSB measurements inside the actual 300-3000 Hz USB passband show
 
 QA ran in tmux `beige-nr-qa:1.1`, port 18867, repo `~/pro/sdrpp-beige`, logs under `/tmp/beige-baseband-nr/`. Both the process and session were stopped after testing; the stop command was `tmux kill-session -t beige-nr-qa`. The initial detached launch and an early smoke attempt did not count as successful receiver tests.
 
-Installation retained all 46 profile JSON files byte-for-byte. The prior installed application is preserved in `build-beige/installed-before-nr-improvement.app.backup-20261022T071443`. The normal receiver reopened with its RTL-SDR, retained plugins and Baseband NR enabled; HTTP is disabled. Native visual inspection confirmed the 12 dB slider, checked automatic acceleration, Apple Accelerate status and 10.2 ms processing delay at the current effective sample rate. Live RF and plugin decoding resumed. Subjective listening feedback was requested separately and remains pending.
+Installation retained all 46 profile JSON files byte-for-byte. The prior installed application is preserved in `build-beige/installed-before-nr-improvement.app.backup-20261022T071443`. The normal receiver reopened with its RTL-SDR, retained plugins and Baseband NR enabled; HTTP is disabled. Native visual inspection confirmed the 12 dB slider, checked automatic acceleration, Apple Accelerate status and 10.2 ms processing delay at the current effective sample rate. Live RF and plugin decoding resumed. Oz's subsequent listening report rejected this release, so 1.3.14 was restored while preparing 1.3.16.
+
+## Baseband NR regression correction (October 22)
+
+Installed 1.3.16 restores the original LOGMMSE sound path and 4x output level. The rejected adaptive mask is moved to `beige/experimental/` and has no production include. Its attenuation slider and endpoint are removed. The original out-of-place FFTW implementation is restored; a local differential benchmark had shown the replacement slower at the 65536-point display size. This is not evidence that every FFT size was slower, and background builds affected wall-clock timing.
+
+The new `ClassicNR` comparison matches the reference LOGMMSE samples exactly with FFTW at 192000 and 204800 S/s, including original level scaling and stream partition. Automatic unsupported-length fallback is also exact. At 204800 S/s, Apple acceleration's maximum sample difference is 3.73e-7 in the fixture. A bounded-output case verifies retained overlap cannot write past the caller's capacity. The experimental algorithm's favorable synthetic results are retained only as research evidence and do not qualify live sound.
+
+The final package passed all six CTest checks, public plugin ABI comparison, Python/Ruff checks, whitespace and complete signature verification. Sixteen isolated receiver checks passed: twelve fallback cycles at 256 kS/s, then four actual Apple/FFTW switches at 204800 S/s. Every case delivered audio samples. The QA process and `beige-nr-qa` tmux session were stopped after the test.
+
+Installation preserved all 46 profile JSON files byte-for-byte; backup: `build-beige/recovery-before-1.3.16.app.backup-20261022T073203`. Normal RTL-SDR reception resumed at the saved tuning, with HTTP disabled. The log confirms the original 800 kS/s / 32000-point NR geometry; that length correctly uses FFTW fallback. Native inspection confirmed the installed 1.3.16 window and ongoing RF reception. Oz confirmed both voice audio and display responsiveness are back to normal in 1.3.16. He also confirmed that 1.3.15 distortion occurred with Baseband NR alone.
+
+## Acceleration and UI follow-up (October 22)
+
+The 1.3.17 numerical regression first failed on all-zero input: the original NR produced nonfinite output with FFTW. A separate test through the actual IFNR wrapper failed on output sample counts when acceleration changed. Noise-power flooring and bounded exponential-integral lookup fix the first fault. Replacing FFT plans without resetting the NR state fixes the second. Neither failure establishes that Apple FFT caused Oz's original live distortion.
+
+The seven-test CTest gate passed, including the production numerical/backend-switch test, existing original-path comparison, AddressSanitizer, portable math and Audio NR2 regressions. Numerical details and commands are in [NOISE-REDUCTION.md](NOISE-REDUCTION.md). The public plugin ABI comparison and full package signature passed.
+
+An isolated four-module receiver compared 2D/3D and Apple/FFTW against the same IQ file. Full-history 3D/FFTW improved from 68.84 to 87.03 FPS after the macOS buffer upload change; the 3D/Apple interval improved from 61.80 to 81.91 FPS. Per-process samples corroborated removal of the repeated `glBufferSubData` wait. Files: `/tmp/beige-accel-qa/performance-before.json`, `performance-after.json`, `sample-before.txt` and `sample-after.txt`. The source is unpaced, so this is a local stress measurement rather than a real-time RF guarantee. QA tmux: `beige-accel-qa`, port 18869; stop with `tmux kill-session -t beige-accel-qa`.
+
+Sixteen receiver restart/fallback/backend checks passed. After final packaging, four further live backend switches passed against the verified bundle, with the loaded NR module path checked using `lsof`. The QA app then shut down with exit code zero while receiving. The GLFW loop now honors the explicit HTTP exit flag outside test builds, allowing this teardown check. Normal launches still disable HTTP. The final QA session exited and left no QA receiver running.
+
+One premature QA launch occurred before packaging/signing completed; its -9 exit and that packaging attempt are discarded. The rebuilt package passed full signature verification before the final successful runtime check. Final packaging log: `/tmp/beige-accel-qa/package-final.log`; runtime result: `final-runtime-check.json`.
+
+Installed 1.3.17 preserves all 46 profile JSON files and ten private plugin binaries byte-for-byte during replacement. Backup: `build-beige/installed-before-1.3.17.app.backup-20261022T074940`; receipt: `/tmp/beige-accel-qa/install-receipt.json`. Complete installed-bundle signature verification passed. Native inspection confirmed version 1.3.17 receiving from the RTL-SDR Blog V4 at the saved 7.165 MHz LSB tuning, with the user's selected 2D view retained. Live listening acceptance of these additional fixes remains pending.
+
+After verification, Oz requested closing Beige whenever it is not being tested. Quit was invoked through its native application menu; process inspection confirmed no Beige instances remained. Do not restart it just to request a listening check.
+
+## Separate standard SDR++ startup report (October 22)
+
+The supplied previous-exit report identifies `/Applications/SDR++.app`, standard version 1.2.0, about 0.7 seconds after launch. Static disassembly places the failure in configuration cleanup after erasing the current JSON-map member while retaining its iterator. LLDB reproduced the same invalid iterator sequence using an isolated profile with one extra key and no radio modules. Neither the standard app nor its normal profile was changed.
+
+Beige has no such erase-during-iteration cleanup loop. Installed 1.3.16 successfully started with the same extra-key case, preserved the key and saved 56 configuration fields. The separate QA process was stopped. This report does not demonstrate a Beige shutdown failure.

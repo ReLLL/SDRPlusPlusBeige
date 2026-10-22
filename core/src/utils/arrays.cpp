@@ -415,14 +415,16 @@ namespace dsp {
                                                       9.728569102044207e-37, 8.742111118267035e-37, 7.854845416198995e-37, 7.056882679059148e-37, 6.339310960770771e-37, 5.694099951521171e-37, 5.114014535116519e-37, 4.592536744710602e-37,
                                                       4.12379530857074e-37, 3.7025020546010802e-37, 3.323894512126695e-37, 2.9836841126333693e-37, 2.6780094483703927e-37, 2.403394099518226e-37, 2.1567085875100187e-37, 1.9351360545310854e-37,
                                                       1.7361413076268668e-37, 1.557442900603584e-37, 1.3969879583508737e-37, 1.2529294766655169e-37, 1.1236058563901255e-37, 1.0075224539594575e-37, 9.033349514993732e-38, 8.098343686625274e-38 };
+                // E1 is only evaluated on nonnegative SNRs. Guard before
+                // converting to an index, including silence's former 0/0.
+                if (x <= 0) return expnarr.front();
+                if (!std::isfinite(x)) return 0;
                 auto index = sqrt(sqrt(x)) * 1000;
+                if (index >= expnarr.size() - 1) return expnarr.back();
                 // auto index = ::pow(x, 1.0 / 4) * 1000;
                 auto iindex = floor(index);
                 auto f = index - iindex;
                 auto v1 = expnarr[iindex] + (expnarr[iindex + 1] - expnarr[iindex]) * f;
-                if (iindex < 0 || iindex >= expnarr.size() - 1) {
-                    std::cerr << "Index out of range in expn" << std::endl;
-                }
                 return v1;
             }
         };
@@ -506,6 +508,57 @@ namespace dsp {
             }
             return centeredSma(squaredDistances, winsize);
         }
+
+        // FFTW planning/destruction is not thread-safe. Display and NR workers
+        // can change their independent backends at the same time.
+        // Plans also belong to process-global services; outlive their teardown.
+        std::mutex& arrayFFTPlannerMutex() { static auto* mutex = new std::mutex; return *mutex; }
+
+        struct fftwPlanImplFFTW : public FFTPlan {
+            int nbuckets;
+            bool reverse;
+            fftwf_plan_s* p;
+            ComplexArray input;
+            ComplexArray output;
+
+            fftwPlanImplFFTW(bool backward, int buckets) : FFTPlan() {
+                auto plan = this;
+                plan->nbuckets = buckets;
+                plan->reverse = backward;
+                plan->input = npzeros_c(buckets);
+                plan->output = npzeros_c(buckets);
+                std::lock_guard<std::mutex> lock(arrayFFTPlannerMutex());
+                auto p = fftwf_plan_dft_1d(buckets, (fftwf_complex*)plan->input->data(), (fftwf_complex*)plan->output->data(), backward ? FFTW_BACKWARD : FFTW_FORWARD, FFTW_ESTIMATE);
+                plan->p = p;
+            }
+
+            ComplexArray getInput() override {
+                return input;
+            }
+            ComplexArray getOutput() override {
+                return output;
+            }
+
+            ComplexArray npfftfft(const ComplexArray& in) override {
+                auto in0 = resize(in, nbuckets);
+                std::copy(in0->begin(), in0->end(), input->begin());
+//                auto out0 = npzeros_c(nbuckets);
+                fftwf_execute(p);
+//                std::copy(output->begin(), output->end(), out0->begin());
+//                this->output->resize(nbuckets);
+                if (reverse) {
+                    div_(this->output, nbuckets);
+                } else {
+                    //return out0;
+                }
+                return this->output;
+            }
+
+            virtual ~fftwPlanImplFFTW() {
+                std::lock_guard<std::mutex> lock(arrayFFTPlannerMutex());
+                fftwf_destroy_plan(p);
+            }
+        };
 
         struct BufferedFFTPlan : public FFTPlan {
             ComplexArray input, output;
@@ -1098,7 +1151,21 @@ namespace dsp {
 
 
         Arg<FFTPlan> allocateFFTWPlan(bool backward, int buckets) {
-            return std::make_shared<BufferedFFTPlan>(backward, buckets, enableAcceleratedFFT);
+            return allocateFFTPlan(backward, buckets, enableAcceleratedFFT);
+        }
+
+        Arg<FFTPlan> allocateFFTPlan(bool backward, int buckets, bool preferApple) {
+            if (preferApple && buckets > 1 && (buckets & (buckets - 1)) == 0) {
+                auto plan = std::make_shared<BufferedFFTPlan>(backward, buckets, true);
+                if (plan->transform.usesApple()) return plan;
+            }
+            // Preserve the original out-of-place FFTW planner and SIMD alignment.
+            return std::make_shared<fftwPlanImplFFTW>(backward, buckets);
+        }
+
+        bool fftPlanUsesApple(const Arg<FFTPlan>& plan) {
+            auto apple = dynamic_cast<BufferedFFTPlan*>(plan.get());
+            return apple && apple->transform.usesApple();
         }
 
         void npfftfft(const ComplexArray& in, const Arg<FFTPlan>& plan) {

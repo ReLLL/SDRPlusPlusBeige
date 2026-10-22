@@ -1,5 +1,8 @@
 #pragma once
 
+// Experimental only. Oz rejected the 1.3.15 live sound/latency on October 22.
+// The active receiver uses ClassicNR; synthetic metrics cannot qualify this path.
+
 #include <utils/complex_fft.h>
 #include <algorithm>
 #include <cmath>

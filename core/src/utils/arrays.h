@@ -124,6 +124,8 @@ namespace dsp {
         };
 
         Arg<FFTPlan> allocateFFTWPlan(bool backward, int buckets);
+        Arg<FFTPlan> allocateFFTPlan(bool backward, int buckets, bool preferApple);
+        bool fftPlanUsesApple(const Arg<FFTPlan>& plan);
 
         void npfftfft(const ComplexArray& in, const Arg<FFTPlan>& plan);
         std::string ftos(float x);

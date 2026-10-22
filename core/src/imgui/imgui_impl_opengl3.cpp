@@ -444,6 +444,13 @@ void    ImGui_ImplOpenGL3_RenderDrawData(ImDrawData* draw_data)
         // Upload vertex/index buffers
         GLsizeiptr vtx_buffer_size = (GLsizeiptr)cmd_list->VtxBuffer.Size * (int)sizeof(ImDrawVert);
         GLsizeiptr idx_buffer_size = (GLsizeiptr)cmd_list->IdxBuffer.Size * (int)sizeof(ImDrawIdx);
+#if defined(__APPLE__)
+        // The Metal-backed GL driver stalls when SubData overwrites geometry
+        // still used by the previous draw list/frame (especially the 3D mesh).
+        // Replace the storage so the driver can retire it asynchronously.
+        glBufferData(GL_ARRAY_BUFFER, vtx_buffer_size, (const GLvoid*)cmd_list->VtxBuffer.Data, GL_STREAM_DRAW);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, idx_buffer_size, (const GLvoid*)cmd_list->IdxBuffer.Data, GL_STREAM_DRAW);
+#else
         if (bd->VertexBufferSize < vtx_buffer_size)
         {
             bd->VertexBufferSize = vtx_buffer_size;
@@ -456,6 +463,7 @@ void    ImGui_ImplOpenGL3_RenderDrawData(ImDrawData* draw_data)
         }
         glBufferSubData(GL_ARRAY_BUFFER, 0, vtx_buffer_size, (const GLvoid*)cmd_list->VtxBuffer.Data);
         glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, idx_buffer_size, (const GLvoid*)cmd_list->IdxBuffer.Data);
+#endif
 
         for (int cmd_i = 0; cmd_i < cmd_list->CmdBuffer.Size; cmd_i++)
         {

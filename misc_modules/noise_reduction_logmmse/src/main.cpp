@@ -43,12 +43,10 @@ public:
         if (config.conf.contains("IFNR")) ifnr = config.conf["IFNR"];
         if (config.conf.contains("DisableCpuDeactivation")) disableCpuDeactivation = config.conf["DisableCpuDeactivation"];
         if (config.conf.contains("SNRChartWidget")) snrChartWidget = config.conf["SNRChartWidget"];
-        if (config.conf.contains("BasebandReductionDB")) reductionDb = std::clamp(float(config.conf["BasebandReductionDB"]), 0.0f, 24.0f);
         if (config.conf.contains("BasebandAcceleration")) acceleration = config.conf["BasebandAcceleration"];
         config.release(true);
 
         ifnrProcessor.setDisableCpuDeactivation(disableCpuDeactivation);
-        ifnrProcessor.setReduction(reductionDb);
         ifnrProcessor.setAcceleration(acceleration);
 
         gui::menu.registerEntry(name, menuHandler, this, NULL);
@@ -59,10 +57,6 @@ public:
         httpdebug::procfs::registerEndpoint(path + "/baseband_nr", [&]() { return ifnr ? "true" : "false"; }, [&](const std::string& v) { ifnr = (v == "true" || v == "1"); actuateIFNR(); }, httpdebug::procfs::Type::Bool);
         httpdebug::procfs::registerEndpoint(path + "/snr_chart", [&]() { return snrChartWidget ? "true" : "false"; }, [&](const std::string& v) { snrChartWidget = (v == "true" || v == "1"); }, httpdebug::procfs::Type::Bool);
         httpdebug::procfs::registerEndpoint(path + "/cpu_usage", [&]() { return std::to_string(ifnrProcessor.percentUsage.load()); }, nullptr, httpdebug::procfs::Type::Int);
-        httpdebug::procfs::registerEndpoint(path + "/reduction_db", [&]() { return std::to_string(reductionDb); }, [&](const std::string& v) {
-            reductionDb = std::clamp(std::stof(v), 0.0f, 24.0f);
-            ifnrProcessor.setReduction(reductionDb);
-        }, httpdebug::procfs::Type::Float);
         httpdebug::procfs::registerEndpoint(path + "/acceleration", [&]() { return acceleration ? "true" : "false"; }, [&](const std::string& v) {
             acceleration = (v == "true" || v == "1");
             ifnrProcessor.setAcceleration(acceleration);
@@ -75,7 +69,6 @@ public:
         httpdebug::procfs::unregister(path + "/baseband_nr");
         httpdebug::procfs::unregister(path + "/snr_chart");
         httpdebug::procfs::unregister(path + "/cpu_usage");
-        httpdebug::procfs::unregister(path + "/reduction_db");
         httpdebug::procfs::unregister(path + "/acceleration");
         httpdebug::procfs::unregister(path + "/backend");
         if (enabled) { enabled = false; updateBindings(); }
@@ -109,7 +102,6 @@ public:
 private:
     bool ifnr = false;
     bool disableCpuDeactivation = false;
-    float reductionDb = 12.0f;
     bool acceleration = true;
 
     bool afnrEnabled = false;
@@ -307,16 +299,6 @@ private:
             }
         }
 
-        ImGui::SetNextItemWidth(menuWidth);
-        if (ImGui::SliderFloat("##baseband_reduction", &reductionDb, 0.0f, 24.0f, "Reduction: %.0f dB")) {
-            ifnrProcessor.setReduction(reductionDb);
-            config.acquire();
-            config.conf["BasebandReductionDB"] = reductionDb;
-            config.release(true);
-        }
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Maximum noise attenuation. Start at 12 dB; lower it for weak signals or digital decoding.\n0 dB keeps the signal level unchanged, with the NR processing delay.");
-        }
 #ifdef __APPLE__
         if (ImGui::Checkbox("Automatic acceleration##baseband", &acceleration)) {
             ifnrProcessor.setAcceleration(acceleration);
@@ -325,12 +307,11 @@ private:
             config.release(true);
         }
         if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Use Apple Accelerate for FFT and vector math when available.\nAutomatically falls back to FFTW. Disable to use FFTW directly.");
+            ImGui::SetTooltip("Use Apple Accelerate FFTs for supported lengths.\nAutomatically falls back to FFTW. Disable to use FFTW directly.");
         }
 #endif
-        if (ifnr && ifnrProcessor.latencySamples() > 0) {
-            ImGui::TextDisabled("%s | %.1f ms", ifnrProcessor.usesApple() ? "Apple Accelerate" : "FFTW",
-                1000.0 * ifnrProcessor.latencySamples() / sigpath::iqFrontEnd.getSampleRate());
+        if (ifnr && ifnrProcessor.percentUsage.load() >= 0) {
+            ImGui::TextDisabled("Math: %s", ifnrProcessor.usesApple() ? "Apple Accelerate" : "FFTW");
         }
 
         for (auto [k, v] : afnrProcessors2) {

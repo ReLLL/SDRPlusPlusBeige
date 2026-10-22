@@ -75,6 +75,7 @@ namespace dsp {
                 bool forceAudio = false;
                 bool forceWideband = false;
                 int forceSampleRate = 0;
+                int fftBackend = -1; // -1: display preference, 0: FFTW, 1: Apple with fallback
 
 
                 int Slen;
@@ -308,8 +309,9 @@ namespace dsp {
 //                    }
                 }
                 params->nFFT = 2 * params->Slen;
-                params->forwardPlan = allocateFFTWPlan(false, params->nFFT);
-                params->reversePlan = allocateFFTWPlan(true, params->nFFT);
+                const bool preferApple = params->fftBackend < 0 ? enableAcceleratedFFT : params->fftBackend == 1;
+                params->forwardPlan = allocateFFTPlan(false, params->nFFT, preferApple);
+                params->reversePlan = allocateFFTPlan(true, params->nFFT, preferApple);
                 params->sums = npzeros(params->nFFT);
                 params->devs = npzeros(params->nFFT);
 
@@ -328,6 +330,7 @@ namespace dsp {
                     params->noise_mu2 = npmavg(params->noise_mu2, 120);
                 }
                 params->noise_mu2 = muleach(params->noise_mu2, params->noise_mu2);
+                npmaximum_(params->noise_mu2, 1e-20f);
 //                for (int ix = 0; ix < params->noise_mu2->size(); ix++) {
 //                    std::cout << "Noise\t" << (ix) << "\t" << params->noise_mu2->at(ix) << std::endl;
 //                }
@@ -349,6 +352,9 @@ namespace dsp {
                 ADD_STEP_STATS();
                 ALLOC_AND_CHECK(x, sz, "logmmse_all point -1.7")
                 params->update_noise_mu2(x);
+                // A silent capture has zero noise power. Keep both SNR
+                // divisions finite without altering ordinary RF noise floors.
+                npmaximum_(params->noise_mu2, 1e-20f);
                 ALLOC_AND_CHECK(x, sz, "logmmse_all point -1.8")
                 ADD_STEP_STATS();
                 auto xfinal = npzeros_c(Nframes * params->len2);

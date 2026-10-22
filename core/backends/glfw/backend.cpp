@@ -258,7 +258,7 @@ namespace backend {
 
     int renderLoop() {
         // Main loop
-        while (!glfwWindowShouldClose(window)) {
+        while (!glfwWindowShouldClose(window) && !httpdebug::shouldExit.load(std::memory_order_acquire)) {
 #ifdef BUILD_TESTS
             // Check if we should exit for testing purposes
             if (sdrpp::test::renderLoopHook.shouldExitRenderLoop()) {

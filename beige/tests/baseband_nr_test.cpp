@@ -1,8 +1,9 @@
-#include "adaptive_nr.h"
+#include "../experimental/adaptive_nr.h"
 #include "bgnoise.h"
 #ifndef BEIGE_NR_STANDALONE
 #include <volk/volk.h>
 #include "logmmse.h"
+#include "classic_nr.h"
 #endif
 #include <cassert>
 #include <chrono>
@@ -57,6 +58,41 @@ std::vector<complex_t> legacy(const std::vector<complex_t>& input, int rate) {
     return result;
 }
 #endif
+
+void classicRegressionChecks() {
+#ifndef BEIGE_NR_STANDALONE
+    for (int rate : {192000, 204800}) {
+        const auto input = makeInput(rate, 3);
+        const auto reference = legacy(input, rate);
+        for (bool apple : {false, true}) {
+            dsp::ClassicNR nr;
+            nr.configure(rate, apple);
+            std::vector<complex_t> result, block(1000000);
+            const int chunk = rate / 50;
+            for (int at = 0; at + chunk <= int(input.size()); at += chunk) {
+                const int written = nr.process(input.data() + at, chunk, block.data());
+                result.insert(result.end(), block.begin(), block.begin() + written);
+            }
+            assert(result.size() == reference.size());
+            float error = 0;
+            for (size_t i = 0; i < result.size(); ++i) {
+                error = (std::max)(error, std::abs(result[i].re - reference[i].re * 4));
+                error = (std::max)(error, std::abs(result[i].im - reference[i].im * 4));
+            }
+            std::cout << "Original NR equivalence " << rate << " Hz, " << (apple ? "auto" : "FFTW") << ": max error " << error << '\n';
+            assert(error < (apple ? 0.001f : 1e-7f));
+        }
+    }
+    dsp::ClassicNR nr;
+    nr.configure(192000, false);
+    auto block = makeInput(192000, 0.5);
+    std::vector<complex_t> bounded(4096);
+    for (int i = 0; i < 5; ++i) {
+        const int written = nr.process(block.data(), int(block.size()), bounded.data(), false, int(bounded.size()));
+        assert(written >= 0 && written <= int(bounded.size()));
+    }
+#endif
+}
 
 void fftChecks() {
     for (int n : {256, 1024, 7680, 8192}) {
@@ -315,7 +351,7 @@ int runTests(int argc, char** argv) {
         std::cout << mode << " " << rate << " samples/s: " << elapsed << " s for " << 20 * repeats << " s IQ, " << 5 * elapsed / repeats << "% of one realtime core\n";
         return 0;
     }
-    fftChecks(); streamChecks(); qualityChecks(); modulationChecks(); changingNoiseChecks(); robustnessChecks(); weakChannelChecks();
+    classicRegressionChecks(); fftChecks(); streamChecks(); qualityChecks(); modulationChecks(); changingNoiseChecks(); robustnessChecks(); weakChannelChecks();
     std::cout << "Baseband NR FFT, reconstruction, stream partitions, backends and quality checks passed.\n";
     return 0;
 }
