@@ -12,5 +12,14 @@
   "rf_fps_median": 95.91388320922852,
   "profile_files_preserved_at_install": 141,
   "physical_reconnection": "Performed by Oz before runtime qualification",
-  "limits": "Interruptions are production-reader cancellations, not all physical hotplug timings. Long-run USB stability is not established."
+  "limits": "Interruptions are production-reader cancellations, not all physical hotplug timings. Long-run USB stability is not established.",
+  "normal_profile_startup": true,
+  "normal_profile_rf": true,
+  "normal_profile_restart": true,
+  "normal_profile_neural_status": "Ready",
+  "voice_lift_ui": "+3 dB",
+  "saved_neural_enable_restored": true,
+  "audio_routing_unchanged": true,
+  "coreaudio_block": "Independent BlackHole probe hang cleared after Oz restarted macOS audio service",
+  "all_instances_closed": true
 }
