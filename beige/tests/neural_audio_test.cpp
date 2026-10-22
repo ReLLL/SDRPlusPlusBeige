@@ -39,6 +39,23 @@ static void compare(const std::vector<dsp::stereo_t>& a, const std::vector<dsp::
 int main(int argc, char** argv) {
     assert(argc == 2);
     const std::string model = argv[1];
+    {
+        std::vector<dsp::stereo_t> input(48000);
+        uint32_t seed = 71;
+        for (int i = 0; i < 48000; ++i) {
+            seed = 1664525 * seed + 1013904223;
+            const float noise = (float(seed >> 8) / 16777216.f - .5f) * .2f;
+            const float voice = .25f * std::sin(2 * 3.141592653589793 * 720 * i / 48000);
+            input[i] = {voice + noise, voice + noise};
+        }
+        auto normal = run(model, input, 48000, 1984, true);
+        for (auto& value : input) { value.l *= 4; value.r *= 4; }
+        auto loud = run(model, input, 48000, 1984, true);
+        for (auto& value : loud) { value.l /= 4; value.r /= 4; }
+        normal.erase(normal.begin(), normal.begin() + 24000);
+        loud.erase(loud.begin(), loud.begin() + 24000);
+        compare(normal, loud, .02);
+    }
     for (int rate : {8000, 16000, 44100, 48000, 96000, 192000}) {
         std::vector<dsp::stereo_t> input(rate);
         for (int i = 0; i < rate; ++i) {
