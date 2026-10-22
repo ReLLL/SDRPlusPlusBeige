@@ -10,6 +10,7 @@
 #include <atomic>
 #include <chrono>
 #include <http_debug_server.h>
+#include "r82xx_controls.h"
 
 #ifdef __ANDROID__
 #include <android_backend.h>
@@ -118,11 +119,30 @@ public:
                 rtlsdr_cancel_async(openDev);
             }
         }, httpdebug::procfs::Type::String);
+        httpdebug::procfs::registerEndpoint("/source/RTL-SDR/tuner", [this]() {
+            return tunerControls.state().dump();
+        }, [this](const std::string& action) {
+            if (action == "readback") { tunerControls.capture(openDev); return; }
+            if (action == "reset_defaults") {
+                if (tunerControls.resetDefaults(gainList.empty() ? 0 : gainList[gainId])) {
+                    applyTunerControls(false, true);
+                    saveTunerControls();
+                }
+                return;
+            }
+            const auto request = json::parse(action, nullptr, false);
+            const bool previous = tunerControls.manual;
+            if (!tunerControls.update(request, openDev)) return;
+            applyTunerControls(previous && !tunerControls.manual,
+                previous != tunerControls.manual || request.contains("bandwidth"));
+            saveTunerControls();
+        }, httpdebug::procfs::Type::String);
     }
 
     ~RTLSDRSourceModule() {
         if (!serverMode) { gui::mainWindow.onWaterfallDrawn.unbindHandler(&waterfallDrawnHandler); }
         httpdebug::procfs::unregister("/source/RTL-SDR/device");
+        httpdebug::procfs::unregister("/source/RTL-SDR/tuner");
         stop(this);
         sigpath::sourceManager.unregisterSource("RTL-SDR");
     }
@@ -198,6 +218,8 @@ public:
             devId = 0;
             gainList.clear();
             gainId = 0;
+            tunerControls.supported = false;
+            tunerControls.manual = false;
             updateGainTxt();
         }
     }
@@ -228,6 +250,8 @@ public:
         
         if (oret < 0 || !probe) {
             selectedDevName = "";
+            tunerControls.supported = false;
+            tunerControls.manual = false;
             flog::error("Could not open RTL-SDR: {0}", oret);
             return;
         }
@@ -295,6 +319,11 @@ public:
         gainId = std::clamp(gainId, 0, (std::max)(0, (int)gainList.size() - 1));
         updateGainTxt();
 
+        tunerControls.load(config.conf["devices"][selectedDevName],
+            gainList.empty() ? 0 : gainList[gainId], rtlsdr_get_tuner_type(probe));
+        // Remote/server controls keep the existing standard gain interface.
+        if (serverMode) tunerControls.manual = false;
+        tunerControls.bypassed = directSamplingMode != 0;
         config.release(created);
 
         rtlsdr_close(probe);
@@ -369,6 +398,7 @@ private:
             if (!_this->gainList.empty()) { rtlsdr_set_tuner_gain(_this->openDev, _this->gainList[_this->gainId]); }
         }
         rtlsdr_set_offset_tuning(_this->openDev, _this->offsetTuning);
+        _this->applyTunerControls(false, true);
 
         _this->asyncCount = (int)roundf(_this->sampleRate / (200 * 512)) * 512;
 
@@ -411,6 +441,7 @@ private:
             }
         }
         _this->freq = freq;
+        if (_this->running) _this->applyTunerControls(false, false);
         flog::info("RTLSDRSourceModule '{0}': Tune: {1}!", _this->name, freq);
     }
 
@@ -477,6 +508,7 @@ private:
                         if (!_this->gainList.empty()) { rtlsdr_set_tuner_gain(_this->openDev, _this->gainList[_this->gainId]); }
                     }
                 }
+                _this->applyTunerControls(false, true);
             }
             if (_this->selectedDevName != "") {
                 config.acquire();
@@ -499,6 +531,12 @@ private:
             }
         }
 
+        _this->tunerControls.bypassed = _this->directSamplingMode != 0;
+        if (!_this->serverMode && _this->tunerControls.drawMode(_this->name, _this->openDev)) {
+            _this->applyTunerControls(!_this->tunerControls.manual, true);
+            _this->saveTunerControls();
+        }
+        if (!_this->tunerControls.manual || _this->tunerControls.bypassed) {
         if (_this->tunerAgc || _this->gainList.size() == 0) { SmGui::BeginDisabled(); }
 
         SmGui::LeftLabel("Gain");
@@ -544,6 +582,13 @@ private:
 
         
         if (_this->tunerAgc || _this->gainList.size() == 0) { SmGui::EndDisabled(); }
+        }
+        bool bandwidthChanged = false;
+        if (!_this->serverMode && _this->tunerControls.drawManual(_this->name,
+                _this->gainList.empty() ? 0 : _this->gainList[_this->gainId], bandwidthChanged)) {
+            _this->applyTunerControls(false, bandwidthChanged);
+            _this->saveTunerControls();
+        }
 
         if (SmGui::Checkbox(CONCAT("Bias T##_rtlsdr_rtl_biast_", _this->name), &_this->biasT)) {
             if (_this->running) {
@@ -579,7 +624,10 @@ private:
         }
 
         SmGui::ForceSync();
-        if (SmGui::Checkbox(CONCAT("Tuner AGC##_rtlsdr_tuner_agc_", _this->name), &_this->tunerAgc)) {
+        if (_this->tunerControls.manual) SmGui::BeginDisabled();
+        bool activeTunerAgc = _this->tunerAgc && !_this->tunerControls.manual;
+        if (SmGui::Checkbox(CONCAT("Tuner AGC##_rtlsdr_tuner_agc_", _this->name), &activeTunerAgc)) {
+            _this->tunerAgc = activeTunerAgc;
             if (_this->running) {
                 if (_this->tunerAgc) {
                     rtlsdr_set_tuner_gain_mode(_this->openDev, 0);
@@ -595,6 +643,27 @@ private:
                 config.release(true);
             }
         }
+        if (_this->tunerControls.manual) SmGui::EndDisabled();
+    }
+
+    void applyTunerControls(bool restoreAuto, bool applyBandwidth) {
+        tunerControls.bypassed = directSamplingMode != 0;
+        if (!openDev || !tunerControls.supported || tunerControls.bypassed) return;
+        if (tunerControls.manual) tunerControls.apply(openDev, applyBandwidth);
+        else if (restoreAuto) {
+            int result = rtlsdr_set_tuner_bandwidth(openDev, 0);
+            if (result >= 0) result = rtlsdr_set_tuner_gain_mode(openDev, tunerAgc ? 0 : 1);
+            if (result >= 0 && !tunerAgc && !gainList.empty()) result = rtlsdr_set_tuner_gain(openDev, gainList[gainId]);
+            tunerControls.error = result;
+        }
+        if (tunerControls.error < 0) flog::warn("RTL-SDR tuner controls failed: {0}", tunerControls.error);
+    }
+
+    void saveTunerControls() {
+        if (selectedDevName.empty()) return;
+        config.acquire();
+        config.conf["devices"][selectedDevName]["manualTuner"] = tunerControls.preferences();
+        config.release(true);
     }
 
     void worker() {
@@ -632,6 +701,7 @@ private:
 
     std::string name;
     rtlsdr_dev_t* openDev = nullptr;
+    R82xxControls tunerControls;
     bool enabled = true;
     dsp::stream<dsp::complex_t> stream;
     double sampleRate;

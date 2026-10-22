@@ -1,0 +1,95 @@
+--- a/include/rtl-sdr.h
++++ b/include/rtl-sdr.h
+@@ -232,6 +232,12 @@
+  */
+ RTLSDR_API int rtlsdr_get_tuner_gain(rtlsdr_dev_t *dev);
+ 
++/* Beige R820T/R828D extension. Stage values are register indices 0..15,
++ * not calibrated dB. No automatic IF/VGA AGC is enabled by this API. */
++#define RTLSDR_BEIGE_GAIN_STAGES 1
++RTLSDR_API int rtlsdr_beige_get_gain_stages(rtlsdr_dev_t *dev, int *lna, int *mixer, int *vga);
++RTLSDR_API int rtlsdr_beige_set_gain_stages(rtlsdr_dev_t *dev, int lna, int mixer, int vga);
++
+ /*!
+  * Set the intermediate frequency gain for the device.
+  *
+--- a/include/tuner_r82xx.h
++++ b/include/tuner_r82xx.h
+@@ -112,6 +112,8 @@
+ };
+ 
+ int r82xx_standby(struct r82xx_priv *priv);
++int r82xx_get_gain_stages(struct r82xx_priv *priv, int *lna, int *mixer, int *vga);
++int r82xx_set_gain_stages(struct r82xx_priv *priv, int lna, int mixer, int vga);
+ int r82xx_init(struct r82xx_priv *priv);
+ int r82xx_set_freq(struct r82xx_priv *priv, uint32_t freq);
+ int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain);
+--- a/src/librtlsdr.c
++++ b/src/librtlsdr.c
+@@ -1049,6 +1049,31 @@
+ 	return r;
+ }
+ 
++int rtlsdr_beige_get_gain_stages(rtlsdr_dev_t *dev, int *lna, int *mixer, int *vga)
++{
++	if (!dev || !lna || !mixer || !vga) return LIBUSB_ERROR_INVALID_PARAM;
++	if (dev->dev_lost) return LIBUSB_ERROR_NO_DEVICE;
++	if (dev->direct_sampling || (dev->tuner_type != RTLSDR_TUNER_R820T &&
++		dev->tuner_type != RTLSDR_TUNER_R828D)) return LIBUSB_ERROR_NOT_SUPPORTED;
++	rtlsdr_set_i2c_repeater(dev, 1);
++	int result = r82xx_get_gain_stages(&dev->r82xx_p, lna, mixer, vga);
++	rtlsdr_set_i2c_repeater(dev, 0);
++	return result;
++}
++
++int rtlsdr_beige_set_gain_stages(rtlsdr_dev_t *dev, int lna, int mixer, int vga)
++{
++	if (!dev || lna < 0 || lna > 15 || mixer < 0 || mixer > 15 || vga < 0 || vga > 15)
++		return LIBUSB_ERROR_INVALID_PARAM;
++	if (dev->dev_lost) return LIBUSB_ERROR_NO_DEVICE;
++	if (dev->direct_sampling || (dev->tuner_type != RTLSDR_TUNER_R820T &&
++		dev->tuner_type != RTLSDR_TUNER_R828D)) return LIBUSB_ERROR_NOT_SUPPORTED;
++	rtlsdr_set_i2c_repeater(dev, 1);
++	int result = r82xx_set_gain_stages(&dev->r82xx_p, lna, mixer, vga);
++	rtlsdr_set_i2c_repeater(dev, 0);
++	return result;
++}
++
+ int rtlsdr_get_tuner_gain(rtlsdr_dev_t *dev)
+ {
+ 	if (!dev)
+--- a/src/tuner_r82xx.c
++++ b/src/tuner_r82xx.c
+@@ -976,6 +976,32 @@
+ 	0, 5, 10, 10, 19, 9, 10, 25, 17, 10, 8, 16, 13, 6, 3, -8
+ };
+ 
++int r82xx_get_gain_stages(struct r82xx_priv *priv, int *lna, int *mixer, int *vga)
++{
++	uint8_t data[4];
++	int result = r82xx_read(priv, 0x00, data, sizeof(data));
++	if (result < 0) return result;
++	int lna_reg = r82xx_read_cache_reg(priv, 0x05);
++	int mixer_reg = r82xx_read_cache_reg(priv, 0x07);
++	/* RF_INDICATOR keeps reporting the AGC estimate in manual mode.
++	 * Use programmed values for manual stages, status only for AGC stages. */
++	*lna = (lna_reg & 0x10) ? (lna_reg & 0x0f) : (data[3] & 0x0f);
++	*mixer = (mixer_reg & 0x10) ? (data[3] >> 4) : (mixer_reg & 0x0f);
++	*vga = r82xx_read_cache_reg(priv, 0x0c) & 0x0f;
++	return 0;
++}
++
++int r82xx_set_gain_stages(struct r82xx_priv *priv, int lna, int mixer, int vga)
++{
++	/* Preserve input switching, power and filter bits. Disable LNA/mixer
++	 * automatic control and the analog VGA pin only in these gain fields. */
++	int result = r82xx_write_reg_mask(priv, 0x05, 0x10 | lna, 0x1f);
++	if (result < 0) return result;
++	result = r82xx_write_reg_mask(priv, 0x07, mixer, 0x1f);
++	if (result < 0) return result;
++	return r82xx_write_reg_mask(priv, 0x0c, vga, 0x1f);
++}
++
+ int r82xx_set_gain(struct r82xx_priv *priv, int set_manual_gain, int gain)
+ {
+ 	int rc;

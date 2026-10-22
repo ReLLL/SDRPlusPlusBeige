@@ -24,6 +24,8 @@ The private driver comes from the [official 2.0.3 archive](https://github.com/st
 
 The build installs into `build-beige/rtl-prefix`. Packaging selects this driver before resolving any stock or carried-over plugin dependency, includes its GPL license, patch and archive/patch checksums, and retains the private patched libusb. Homebrew and Brown remain unchanged.
 
+Version 1.3.28 also applies `rtlsdr-r82xx-gains.patch` after the lifetime patch. It adds typed, masked gain-stage control without replacing async cleanup. Both patches and checksums ship together; see [RTL-CONTROLS.md](RTL-CONTROLS.md). Native/ASAN lifetime tests and twenty hardware restart/recovery cycles pass with the combined driver.
+
 `rtl_async_lifetime_test.c` compiles the actual pinned driver with delayed USB completions. The pristine driver reproducibly frees pending transfers on hard event errors and device loss; that failing test was committed before the fix. The patched driver passes seven scenarios repeated 100 times each, both normally and under AddressSanitizer: event error, device loss, partial submission failure, intentional cancel, resubmission failure, repeated event errors and interrupted-event retry. Two CTests cover these runs. No hardware is opened by the native harness.
 
 Use `rtl_usb_smoke.py --interrupt` with an isolated RTL-SDR/Radio/NR/Null Sink profile to add ten reader cancellation/automatic-stop/restart cycles. Test with Source collapsed and `showMenu=false`. `/proc/source/RTL-SDR/device` now also reports `read_result` and `worker_ended`; its QA-only `cancel_read` action ends the production reader without unplugging USB.

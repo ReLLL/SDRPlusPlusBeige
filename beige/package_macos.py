@@ -129,6 +129,7 @@ def package(build, brown_app=None, usb_prefix=None, rtl_prefix=None):
         shutil.copy2(rtl_prefix / 'share/licenses/rtlsdr/COPYING', contents / 'Resources/librtlsdr-COPYING')
         shutil.copy2(rtl_prefix / 'beige-rtlsdr.json', contents / 'Resources/beige-rtlsdr.json')
         shutil.copy2(root / 'beige/patches/rtlsdr-async-lifetime.patch', contents / 'Resources/rtlsdr-async-lifetime.patch')
+        shutil.copy2(root / 'beige/patches/rtlsdr-r82xx-gains.patch', contents / 'Resources/rtlsdr-r82xx-gains.patch')
     copy_binary(install / 'bin/sdrpp', contents / 'MacOS/sdrpp')
     copy_binary(install / 'lib/libsdrpp_core.dylib', contents / 'Frameworks/libsdrpp_core.dylib')
     for plugin in sorted((install / 'lib/sdrpp/plugins').glob('*.dylib')):

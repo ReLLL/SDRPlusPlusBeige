@@ -1,5 +1,13 @@
 # Beige validation
 
+## RTL-SDR manual controls (October 22, 1.3.28)
+
+Twenty CTests, public plugin ABI comparison, complete build and packaged signature verification pass. The added native/ASAN gain tests cover all 4,096 combinations each; the preference test covers compatibility, malformed values and atomic updates. Live V4 testing confirms independent stage effects, bandwidth response, Auto restoration, saved-mode recovery, finite audio, ten normal and ten interrupted-reader restarts. A later four-case 130-second comparison remains receiving throughout. One earlier stream stopped cleanly with result -1; no cause or universal USB-stability claim is established.
+
+The installed normal profile receives at its saved tune through its existing Audio sink. Installation preserves 137 checked JSON, resource and private-plugin files byte-for-byte. Details, measurements, UI acceptance and limits: [RTL-CONTROLS.md](RTL-CONTROLS.md).
+
+Oz confirmed physical Auto/Manual switching in 1.3.28. Version 1.3.29 adds Reset to defaults for Manual controls, retaining the selected mode. All twenty CTests, ABI, signature and live reset/finite-audio checks pass. The installed normal profile receives with Oz's saved settings; all instances close after testing.
+
 Read when: verifying the spectrum renderer, imported plugins or a packaged build.
 
 ## Automated gate

@@ -4,6 +4,8 @@ Read when: adding RTL-SDR gain, hardware filtering, telemetry or AGC controls.
 
 Reviewed October 22, 2026 against installed Beige 1.3.27 and its private RTL-SDR 2.0.3 driver. This is a source/API review, not an RF improvement measurement. No installed app, receiver preference or hardware register was changed.
 
+Subsequent implementation: 1.3.28 adds optional Manual stage gain and nominal hardware bandwidth controls while keeping Auto as the default. V4 RF filters stay automatic. See [RTL-CONTROLS.md](RTL-CONTROLS.md) for behavior, hardware measurements and limits; the findings below describe the preceding review.
+
 ## Findings
 
 The requested [older module](https://github.com/Sultan-papagani/sdrpp_new_rtlsdr_source) marks itself incompatible with current SDR++ nightlies and links to its [replacement](https://github.com/Sultan-papagani/sdrpp_rtlsdr_source). Its controls make real driver calls, but neither module is a drop-in replacement for Beige. Symbol inspection finds five missing macOS extension functions in the older module and six in the replacement; Android-only open functions were excluded. The replacement specifically depends on the author's modified old-dab driver, including an extra DAGC readout function.
