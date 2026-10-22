@@ -4,6 +4,8 @@ Read when: verifying the spectrum renderer, imported plugins or a packaged build
 
 ## Automated gate
 
+For neural model discovery, run `neural_resources_smoke.py` with `--app`, a four-module File-source `--template`, `--overlay` without the model, and a new `--work-dir`. This covers the imported resource layout that 1.3.22's bundled-resource tests missed. It must reach Ready and deliver finite audio without adding a model to the overlay. The standalone `beige_neural_model_path` test also covers bundle relocation and unbundled fallback.
+
 Audio NR2/neural audio qualification for 1.3.22 is in [AUDIO-NR.md](AUDIO-NR.md). The twelve-test gate includes normal/ASAN neural packet/backend/rate/bypass checks and an exact array-ownership regression for repeated Audio NR2 resets. Operator listening remains separate from controlled speech metrics.
 
 - Build all enabled stock modules and the core together.

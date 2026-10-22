@@ -15,6 +15,12 @@ target_compile_features(beige_history_test PRIVATE cxx_std_17)
 target_compile_options(beige_history_test PRIVATE $<$<CXX_COMPILER_ID:AppleClang,Clang,GNU>:-UNDEBUG>)
 add_test(NAME beige_history COMMAND beige_history_test)
 
+add_executable(beige_neural_model_path_test neural_model_path_test.cpp)
+target_include_directories(beige_neural_model_path_test PRIVATE "${CMAKE_SOURCE_DIR}/misc_modules/noise_reduction_logmmse/src")
+target_compile_features(beige_neural_model_path_test PRIVATE cxx_std_17)
+target_compile_options(beige_neural_model_path_test PRIVATE $<$<CXX_COMPILER_ID:AppleClang,Clang,GNU>:-UNDEBUG>)
+add_test(NAME beige_neural_model_path COMMAND beige_neural_model_path_test)
+
 add_executable(beige_baseband_nr_test baseband_nr_test.cpp)
 target_include_directories(beige_baseband_nr_test PRIVATE "${SDRPP_CORE_ROOT}"
     "${CMAKE_SOURCE_DIR}/misc_modules/noise_reduction_logmmse/src")

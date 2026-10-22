@@ -55,6 +55,18 @@ An eight-second Time Profiler capture targets the final 1.3.22 RF process with v
 
 Installed 1.3.22 preserves all 106 private-profile JSON files and 17 private binary files, including retained backups, byte-for-byte during replacement. The prior 1.3.20 app is preserved under `build-beige/installed-before-1.3.22.app.backup-20261022T063244128341Z`. Normal startup reaches Ready with HTTP disabled, retains the latest saved 17.185 MHz AM tune and 2D view, and leaves Neural Voice NR off. The normal profile was not used for synthetic audio. Operator comparison of the new audio option is pending; earlier Baseband acceptance does not qualify this separate neural method.
 
+## Custom resource folder correction (1.3.23)
+
+Oz's first normal-profile comparison showed `Unavailable; bypassed`. The imported band-plan resources live outside the app. Version 1.3.22 searched that folder for the newly bundled model, which was absent there. Earlier isolated receiver tests used the bundle resources and missed this layout. Changing only the resource location restored Ready in the same receiver, confirming a model-discovery failure rather than an inference or audio-rate problem.
+
+Version 1.3.23 locates the current macOS executable and prefers its own `Contents/Resources/models/gtcrn.onnx`. Custom band plans, palettes and the configured resource directory remain untouched. Unbundled/other-platform builds and bundles without that file retain the configured resource path. This lookup runs when attaching a radio; the audio processing algorithm and acceleration are unchanged.
+
+`neural_resources_smoke.py` runs the real packaged module with a separate four-module File-source profile and a custom overlay without a model. Before the fix it reproduced the exact unavailable status and missing-file error. The standalone path test covers moved bundles, spaces, bundle preference and configured-path fallback. Private listening acceptance remains pending.
+
+The final 1.3.23 package passes all thirteen CTests, public ABI, full signature, Python/Ruff and whitespace checks. The overlay receiver reaches Ready with zero invalid samples; all sixteen modulation transitions, mutual exclusion and restart checks pass again with that overlay. Installed live RTL-SDR reception also reaches Ready in the full normal profile with positive neural worker CPU. These checks verify processing availability, not listening quality. Both test receivers exited cleanly; no Beige instance was left running.
+
+Installation preserved 106 JSON files, fourteen detected private Mach-O files and 23 custom resource files byte-for-byte. Private receipts, the old app backup path and logs are recorded under `/tmp/beige-neural-path-20261022/`. The model remains inside the app; no model was copied into the band-plan overlay.
+
 ## Reproduction and sources
 
 ```bash

@@ -17,6 +17,7 @@
 #include "baseband_mode.h"
 #ifdef BEIGE_NEURAL_AUDIO
 #include "neural_audio.h"
+#include "neural_model_path.h"
 #endif
 #include <http_debug_server.h>
 
@@ -202,7 +203,7 @@ private:
 #ifdef BEIGE_NEURAL_AUDIO
         auto neural = std::make_shared<dsp::NeuralVoiceNR>();
         neural->init(nullptr);
-        neural->modelPath = std::string(sdrppResourcesDirectory) + "/models/gtcrn.onnx";
+        neural->modelPath = dsp::neuralModelPath(sdrppResourcesDirectory);
         neural->sampleRate = int(sigpath::sinkManager.getStreamSampleRate(instanceName));
         config.acquire();
         neural->allowed = config.conf.value("NeuralVoiceNR_" + instanceName, false);
