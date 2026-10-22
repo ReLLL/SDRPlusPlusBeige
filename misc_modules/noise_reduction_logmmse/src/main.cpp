@@ -466,7 +466,7 @@ private:
             auto neural = neuralProcessors.at(k);
             bool voice = neural->allowed.load();
             if (ImGui::Checkbox(("Neural Voice NR " + k + "##neural_" + k).c_str(), &voice)) setNeural(k, voice);
-            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Local GTCRN speech reduction. Off by default.\nEnabling selects it instead of Audio NR2 for this radio.\nCW, RAW and WFM bypass it. For USB/LSB digital signals, leave it off.\nCPU SIMD and optional Apple FFT; portable FFT fallback.");
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Local GTCRN speech reduction with automatic voice-level recovery.\nEnabling selects it instead of Audio NR2 for this radio.\nCW, RAW and WFM bypass it. For USB/LSB digital signals, leave it off.\nCPU SIMD and optional Apple FFT; portable FFT fallback.");
             if (voice) {
                 if (!neural->voiceMode) ImGui::TextDisabled("Bypassed for this mode");
                 else if (neural->status < 0) ImGui::TextDisabled("Unavailable; bypassed");

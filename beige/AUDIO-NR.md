@@ -67,6 +67,35 @@ The final 1.3.23 package passes all thirteen CTests, public ABI, full signature,
 
 Installation preserved 106 JSON files, fourteen detected private Mach-O files and 23 custom resource files byte-for-byte. Private receipts, the old app backup path and logs are recorded under `/tmp/beige-neural-path-20261022/`. The model remains inside the app; no model was copied into the band-plan overlay.
 
+## Neural level recovery and radio input range (1.3.24)
+
+Oz rejected the first live neural comparison: quieter voice and remaining noise, worse than Audio NR2. Version 1.3.23 only fixed model discovery; it did not qualify the model's listening quality. Oz then explicitly requested automatic level recovery inside neural processing.
+
+The native 1.3.24 engine limits the model's input RMS envelope to 0.1, then reverses that attenuation before synthesis. This keeps high radio AGC levels within a more useful model range without boosting quiet input. A regression through the actual engine originally measured relative output error 2.70 when scaling the same input by four; the normalized path now passes the 0.02 bound. Frame timing, resamplers, inference provider and FFT backends remain unchanged.
+
+Post-reduction gain estimates attenuation in the 125-4000 Hz bins retained by the model. It holds through rejected noise/silence, smooths recovery and is bounded to 1-4x. A second 20 ms smoothing stage applies gain to the reconstructed audio. This restores wanted-speech level rather than forcing the total noisy input RMS back up. There is no extra checkbox or volume slider. The estimate is a spectral heuristic, not an independent speech detector, and cannot recover speech already removed by the model.
+
+Sixty-four controlled cases use the three previous excerpts plus a separately held-out synthesized voice, eight conditions and two input levels. The higher level is 32x the earlier fixture amplitude, representing the range radio AGC can produce. Means exclude clean cases; each level contains 28 noisy cases:
+
+| Input / metric | Before | After |
+|---|---:|---:|
+| Ordinary: wanted-speech level, dB relative to input speech | -5.38 | -0.25 |
+| Higher: wanted-speech level, dB relative to input speech | -7.07 | -1.32 |
+| Ordinary: eSTOI | 0.4190 | 0.4159 |
+| Higher: eSTOI | 0.3118 | 0.3830 |
+| Ordinary: SI-SDR, dB | 6.66 | 5.49 |
+| Higher: SI-SDR, dB | 1.73 | 4.76 |
+| Higher: pause noise after matching speech level, dB | -35.24 | -45.29 |
+| Higher: median worker CPU, percent of one core | 3.05 | 3.07 |
+
+The level goal improves substantially; quality gains are strongest at high input. Ordinary-level SI-SDR decreases with the time-varying recovery gain, and some individual cases regress. A 1.5x/2x sharpening of the neural spectral mask further reduced speech scores and was not shipped. These are controlled narrowband speech proxies from one human speaker and synthetic voices, not proof of better live audio than NR2. NR2 remains available and unchanged. Human listening acceptance is still required.
+
+Raw results: `experimental/results/2026-10-22-audio/neural-level-recovery.json`. Reproduce with `neural_level_evaluate.py` and before/after native lab binaries; the broader rejected-mask study is `neural_quality_probe.py`. Private fixture audio and logs remain under `/tmp/beige-neural-quality-20261022/`.
+
+The final package passes all fourteen CTests, ABI/signature and Python/Ruff/whitespace checks. The custom-resource receiver reaches Ready with finite audio. An isolated live RTL-SDR receiver passes sixteen mode transitions, restart and mutual exclusion; the neural interval measures 4.06% worker CPU and 104 FPS in 3D. Those brief figures exclude private plugins. Installation preserves 106 JSON files, fourteen detected private Mach-O files and 23 custom resource files; the old app and private receipt are retained.
+
+Installed 1.3.24 also reaches Ready with active neural processing during normal-profile RTL-SDR reception. The previous audio-reducer selections were restored after that check. All Beige test instances exited cleanly and were left closed. Operator listening comparison of this correction remains pending.
+
 ## Reproduction and sources
 
 ```bash

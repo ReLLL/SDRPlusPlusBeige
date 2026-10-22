@@ -1,6 +1,7 @@
 #ifdef BEIGE_NEURAL_AUDIO
 #include "neural_audio.h"
 #include "audio_resampler.h"
+#include "neural_voice_level.h"
 #include <onnxruntime_cxx_api.h>
 #include <utils/complex_fft.h>
 #include <array>
@@ -28,6 +29,7 @@ struct NeuralVoiceEngine::State {
           forward(512, false, apple), inverse(512, true, apple), rate(sampleRate) {
         down.configure(rate, 16000);
         up.configure(16000, rate);
+        gainSmoothing = 1.f - std::exp(-1.f / (.02f * rate));
         for (int i = 0; i < 512; ++i)
             window[i] = std::sqrt(.5 - .5 * std::cos(2 * pi * i / 512));
         auto memory = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
@@ -49,6 +51,9 @@ struct NeuralVoiceEngine::State {
         history.fill(0); overlap.fill(0);
         frameCount = readIndex = writeIndex = queued = 0;
         ramp = 0;
+        modelLevel = 0;
+        voiceLevel.reset();
+        outputGain = 1;
         // Keep enough queued samples to cover a 16 ms inference hop.
         const int padding = (rate + 49) / 50 + 8;
         for (int i = 0; i < padding; ++i) enqueue({0, 0});
@@ -64,17 +69,25 @@ struct NeuralVoiceEngine::State {
     void frame() {
         std::copy(history.begin() + 256, history.end(), history.begin());
         std::copy(pending.begin(), pending.end(), history.begin() + 256);
+        double power = 0;
+        for (float value : history) power += double(value) * value;
+        modelLevel = (std::max)(float(std::sqrt(power / 512)), .98f * modelLevel);
+        // Radio AGC levels can exceed training audio. Attenuate for inference,
+        // then undo that gain before overlap-add; do not raise quiet input/noise.
+        const float modelGain = modelLevel > .1f ? .1f / modelLevel : 1.f;
         for (int i = 0; i < 512; ++i) bins[i] = {history[i] * window[i], 0};
         forward.execute(bins.data());
         for (int i = 0; i < 257; ++i) {
-            input[0][2*i] = bins[i].re;
-            input[0][2*i+1] = bins[i].im;
+            input[0][2*i] = bins[i].re * modelGain;
+            input[0][2*i+1] = bins[i].im * modelGain;
         }
         static const char* names[] = {"mix", "conv_cache", "tra_cache", "inter_cache"};
         static const char* resultNames[] = {"enh", "conv_cache_out", "tra_cache_out", "inter_cache_out"};
         session.Run(Ort::RunOptions{nullptr}, names, inputs.data(), 4, resultNames, outputs.data(), 4);
         for (int i = 1; i < 4; ++i) std::copy(output[i].begin(), output[i].end(), input[i].begin());
-        for (int i = 0; i < 257; ++i) bins[i] = {output[0][2*i], output[0][2*i+1]};
+        for (int i = 0; i < 257; ++i) enhanced[i] = {output[0][2*i] / modelGain, output[0][2*i+1] / modelGain};
+        voiceLevel.update(bins.data(), enhanced.data());
+        std::copy(enhanced.begin(), enhanced.end(), bins.begin());
         for (int i = 1; i < 256; ++i) bins[512-i] = {bins[i].re, -bins[i].im};
         inverse.execute(bins.data());
         for (int i = 0; i < 256; ++i) {
@@ -98,8 +111,9 @@ struct NeuralVoiceEngine::State {
             readIndex = (readIndex + 1) % queue.size();
             --queued;
             ramp = (std::min)(1.f, ramp + 1.f / (.1f * rate));
+            outputGain += gainSmoothing * (voiceLevel.gain() - outputGain);
             // Aligned dry/wet paths; ease into the independent voice reducer.
-            const float mixed = value.l + ramp * (value.r - value.l);
+            const float mixed = value.l + ramp * (value.r * outputGain - value.l);
             destination[i] = {mixed, mixed};
         }
     }
@@ -113,11 +127,14 @@ struct NeuralVoiceEngine::State {
     std::vector<Ort::Value> inputs, outputs;
     std::array<float,512> window{}, history{};
     std::array<complex_t,512> bins{};
+    std::array<complex_t,257> enhanced{};
     std::array<float,256> pending{}, overlap{};
     std::array<stereo_t,8192> queue{};
     int rate, frameCount = 0;
     size_t readIndex = 0, writeIndex = 0, queued = 0;
     float ramp = 0;
+    float modelLevel = 0, outputGain = 1, gainSmoothing = 0;
+    NeuralVoiceLevel voiceLevel;
 };
 
 NeuralVoiceEngine::NeuralVoiceEngine(const std::string& model, int rate, bool apple)
