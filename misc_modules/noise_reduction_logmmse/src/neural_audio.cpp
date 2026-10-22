@@ -124,7 +124,7 @@ struct NeuralVoiceEngine::State {
                 const float detail = clarityOptions & NeuralClarity::Detail ? .15f * clarity.speech() : 0;
                 detailMix += gainSmoothing * (detail - detailMix);
                 if (!detail && detailMix < 1e-6f) detailMix = 0;
-                const float lift = clarityOptions & NeuralClarity::Lift ? 1.f + .12201845f * clarity.speech() : 1.f;
+                const float lift = clarityOptions & NeuralClarity::Lift ? 1.f + .41253754f * clarity.speech() : 1.f;
                 liftGain += gainSmoothing * (lift - liftGain);
                 if (lift == 1.f && std::abs(liftGain - 1.f) < 1e-5f) liftGain = 1;
                 wet = (wet + detailMix * (value.l - wet)) * liftGain;

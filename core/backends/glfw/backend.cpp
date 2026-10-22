@@ -324,11 +324,9 @@ namespace backend {
 
                 if (httpdebug::getSdrStartRequest()) {
                     gui::mainWindow.setPlayState(true);
-                    httpdebug::setSdrPlaying(true);
                 }
                 if (httpdebug::getSdrStopRequest()) {
                     gui::mainWindow.setPlayState(false);
-                    httpdebug::setSdrPlaying(false);
                 }
 
                 std::string srcReq = httpdebug::getSourceChangeRequest();

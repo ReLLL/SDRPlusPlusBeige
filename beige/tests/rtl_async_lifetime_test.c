@@ -73,8 +73,10 @@ int LIBUSB_CALL libusb_handle_events_timeout_completed(libusb_context *ctx,
     return 0;
 }
 
-int main(int argc, char **argv) {
-    scenario = argc > 1 ? atoi(argv[1]) : 0;
+static void run_case(void) {
+    ticks = submitted = freed = fault = 0;
+    memset(pending, 0, sizeof(pending));
+    memset(cancelling, 0, sizeof(cancelling));
     rtlsdr_dev_t device = {0};
     current_dev = &device;
     device.devh = (libusb_device_handle *)&device;
@@ -82,6 +84,15 @@ int main(int argc, char **argv) {
     assert(device.async_status == RTLSDR_INACTIVE && !device.xfer && !device.xfer_buf);
     for (int i = 0; i < 8; ++i) assert(!pending[i] && !slots[i]);
     assert(freed == 4);
-    if (scenario != 3 && scenario != 6) assert(result < 0);
-    printf("RTL async lifetime scenario %d: all callbacks reaped before free (%d event calls).\n", scenario, ticks);
+    if (scenario == 3 || scenario == 6) assert(result == 0);
+    else assert(result < 0);
+}
+
+int main(int argc, char **argv) {
+    const int first = argc > 1 ? atoi(argv[1]) : 0;
+    const int last = argc > 1 ? first : 6;
+    for (scenario = first; scenario <= last; ++scenario) {
+        for (int repeat = 0; repeat < 100; ++repeat) run_case();
+        printf("RTL async lifetime scenario %d: 100 delayed-completion cycles passed.\n", scenario);
+    }
 }

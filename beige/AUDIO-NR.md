@@ -130,6 +130,16 @@ The final package passes fifteen CTests, public ABI/signature, Python/Ruff and w
 
 Installed 1.3.25 reaches Ready in the normal profile and reports all three new switches false. Its bundled model is byte-identical to 1.3.24. Installation preserves 106 JSON files, fourteen detected private Mach-O files and 23 resources. The normal-profile device endpoint subsequently reports zero RTL-SDR devices; no new normal-profile RF reception is claimed. Reconnection/Refresh and listening are manual follow-up checks. All Beige instances were closed after verification.
 
+## Listening feedback and voice lift (1.3.27)
+
+Oz reports that Speech detail helps but adds a little noise; Syllable smoothing initially gave no obvious difference, followed by a selection of both options in the listening response. Keep both controls available and preserve explicit saved choices. Missing preferences still leave every clarity experiment off; the accepted base model and processing values remain unchanged.
+
+Voice lift now offers up to +3 dB around detected speech, as requested. Six controlled speech/noise cases measure 2.84-2.99 dB more wanted speech, averaging 2.93 dB. All-off output matches the saved 1.3.24 engine exactly in those six runs; prior broader testing established only floating-point repeat precision, not universal byte identity. This change raises level and does not recover letters removed by the model. Clarity and smoothing algorithms are unchanged.
+
+All eight combinations deliver finite audio with the custom resource overlay in the File receiver and the installed 1.3.27 RTL-SDR receiver. RF median UI rate is 95.9 FPS in 3D; measured neural worker CPU varies from 4.1% to 7.7% of one core during these short intervals. This is not a matched performance comparison or listening acceptance. The bundled model remains byte-identical to 1.3.25; installation preserves all 141 checked profile/config/plugin/resource files.
+
+The final normal-profile launch encountered a separate CoreAudio wait while PortAudio probes BlackHole 2ch. A standalone PortAudio program reproduces it outside Beige at both 8 kHz and 48 kHz. The bundled PortAudio and legacy Audio sink binaries are byte-identical to 1.3.25. Beige is closed; a manual macOS audio-service restart was requested before repeating the normal-profile startup check. No sink preference was changed to hide the failure.
+
 ## Reproduction and sources
 
 ```bash

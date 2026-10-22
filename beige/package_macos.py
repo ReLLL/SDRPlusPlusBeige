@@ -13,7 +13,7 @@ def run(*args):
     return subprocess.check_output(args, text=True, stderr=subprocess.STDOUT)
 
 
-def package(build, brown_app=None, usb_prefix=None):
+def package(build, brown_app=None, usb_prefix=None, rtl_prefix=None):
     root = pathlib.Path(__file__).resolve().parents[1]
     build = build.resolve()
     install = build / 'install'
@@ -123,6 +123,12 @@ def package(build, brown_app=None, usb_prefix=None):
         shutil.copy2(usb_prefix / 'share/licenses/libusb/COPYING', contents / 'Resources/libusb-COPYING')
         shutil.copy2(usb_prefix / 'beige-libusb.json', contents / 'Resources/beige-libusb.json')
         shutil.copy2(root / 'beige/patches/libusb-darwin-disconnect.patch', contents / 'Resources/libusb-darwin-disconnect.patch')
+    if rtl_prefix:
+        rtl_prefix = rtl_prefix.resolve()
+        copy_binary(rtl_prefix / 'lib/librtlsdr.0.dylib', contents / 'Frameworks/librtlsdr.0.dylib')
+        shutil.copy2(rtl_prefix / 'share/licenses/rtlsdr/COPYING', contents / 'Resources/librtlsdr-COPYING')
+        shutil.copy2(rtl_prefix / 'beige-rtlsdr.json', contents / 'Resources/beige-rtlsdr.json')
+        shutil.copy2(root / 'beige/patches/rtlsdr-async-lifetime.patch', contents / 'Resources/rtlsdr-async-lifetime.patch')
     copy_binary(install / 'bin/sdrpp', contents / 'MacOS/sdrpp')
     copy_binary(install / 'lib/libsdrpp_core.dylib', contents / 'Frameworks/libsdrpp_core.dylib')
     for plugin in sorted((install / 'lib/sdrpp/plugins').glob('*.dylib')):
@@ -145,5 +151,6 @@ if __name__ == '__main__':
     parser.add_argument('build', type=pathlib.Path)
     parser.add_argument('--brown-app', type=pathlib.Path)
     parser.add_argument('--usb-prefix', type=pathlib.Path)
+    parser.add_argument('--rtl-prefix', type=pathlib.Path)
     options = parser.parse_args()
-    package(options.build, options.brown_app, options.usb_prefix)
+    package(options.build, options.brown_app, options.usb_prefix, options.rtl_prefix)

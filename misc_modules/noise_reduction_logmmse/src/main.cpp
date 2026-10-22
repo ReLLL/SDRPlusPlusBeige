@@ -494,7 +494,7 @@ private:
                 for (auto [label, flag, tip] : std::initializer_list<std::tuple<const char*, unsigned, const char*>>{
                         {"Speech detail", dsp::NeuralClarity::Detail, "Test: blend a little aligned original audio around detected speech.\nMay preserve weak consonants, with some noise during speech."},
                         {"Syllable smoothing", dsp::NeuralClarity::Smooth, "Test: soften brief drops in the neural spectrum around speech.\nMay reduce choppiness, with short noise tails."},
-                        {"Voice lift (+1 dB)", dsp::NeuralClarity::Lift, "Test: a small level boost around detected speech.\nDoes not reconstruct speech removed by the model."}}) {
+                        {"Voice lift (+3 dB)", dsp::NeuralClarity::Lift, "Test: up to 3 dB more level around detected speech.\nDoes not reconstruct speech removed by the model."}}) {
                     bool checked = neural->clarityOptions.load() & flag;
                     if (ImGui::Checkbox((std::string(label) + "##neural_" + k).c_str(), &checked)) setClarity(k, flag, checked);
                     if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tip);

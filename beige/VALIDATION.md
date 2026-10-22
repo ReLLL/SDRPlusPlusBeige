@@ -4,6 +4,8 @@ Read when: verifying the spectrum renderer, imported plugins or a packaged build
 
 ## Automated gate
 
+Version 1.3.27 adds native and AddressSanitizer tests of the actual RTL-SDR driver, bringing the gate to seventeen CTests. Seven delayed-completion scenarios run 100 times each per executable. See [USB-HOTPLUG.md](USB-HOTPLUG.md) for the stop/restart crash, pinned dependency and hardware-check limits.
+
 Neural clarity switches add a fifteenth CTest, eight-combination native/ASAN packet checks, and `neural_clarity_smoke.py`. Test missing-preference defaults, independent changes, finite output, return to all-off and saved choices. Compare the all-off native engine with the saved 1.3.24 binary at its floating-point repeat precision; baseline parameters must remain unchanged.
 
 Neural 1.3.24 level recovery adds `beige_neural_voice_level`: known speech attenuation, rejected-noise exclusion, silence hold, clean unity and the gain bound. Actual-engine packet/FFT/rate/ASAN checks include high-level scale invariance. The complete gate now contains fourteen CTests. Controlled speech results and limitations are in [AUDIO-NR.md](AUDIO-NR.md).
@@ -25,6 +27,8 @@ History tests cover newest-first order, live front updates, bounded retention, n
 ## Runtime checks
 
 Use a separate QA profile and deterministic synthetic IQ. Verify 3D by default, 2D/3D switching, saved preference after reopening, palette behavior, retuning, resizing, source stop/start and history reset. The normal receiver profile must never be used for synthetic reception tests.
+
+With the Source panel collapsed, explicitly send File Source `set_path` before playback; the menu's lazy file-open path otherwise has not run. For RTL restart tests, wait for `/sdr/status` to finish its transition before querying UI-queued procfs endpoints: re-enumeration can exceed their one-second queue deadline.
 
 Compare the same running receiver in both display modes. Record median, mean and 95th-percentile spectrum CPU drawing times and UI frame rate. Check that unchanged frames reuse the mesh. Check bounded vertex/index counts. These measurements do not measure total radio processing or GPU latency.
 

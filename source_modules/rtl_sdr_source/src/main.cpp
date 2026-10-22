@@ -8,6 +8,7 @@
 #include <gui/smgui.h>
 #include <rtl-sdr.h>
 #include <atomic>
+#include <chrono>
 #include <http_debug_server.h>
 
 #ifdef __ANDROID__
@@ -95,20 +96,32 @@ public:
         selectByName(selectedDevName);
 
         sigpath::sourceManager.registerSource("RTL-SDR", &handler);
+        if (!serverMode) {
+            waterfallDrawnHandler.ctx = this;
+            waterfallDrawnHandler.handler = [](ImGuiContext*, void* ctx) {
+                ((RTLSDRSourceModule*)ctx)->reconcileWorker();
+            };
+            gui::mainWindow.onWaterfallDrawn.bindHandler(&waterfallDrawnHandler);
+        }
         httpdebug::procfs::registerEndpoint("/source/RTL-SDR/device", [this]() {
             return json{{"count", devCount}, {"selected", selectedDevName},
                 {"index", devId}, {"gains", gainList.size()}, {"running", running},
-                {"refreshes", refreshCount}}.dump();
+                {"refreshes", refreshCount}, {"read_result", readResult.load()},
+                {"worker_ended", workerEnded.load()}}.dump();
         }, [this](const std::string& action) {
             if (action == "refresh" && !running) {
                 refresh();
                 selectByName(selectedDevName);
                 propagateInputSampleRate(this);
             }
+            else if (action == "cancel_read" && running) {
+                rtlsdr_cancel_async(openDev);
+            }
         }, httpdebug::procfs::Type::String);
     }
 
     ~RTLSDRSourceModule() {
+        if (!serverMode) { gui::mainWindow.onWaterfallDrawn.unbindHandler(&waterfallDrawnHandler); }
         httpdebug::procfs::unregister("/source/RTL-SDR/device");
         stop(this);
         sigpath::sourceManager.unregisterSource("RTL-SDR");
@@ -130,6 +143,7 @@ public:
 
     void refresh() {
         if (running) { return; }
+        needsRefresh = false;
         ++refreshCount;
         devNames.clear();
         devListTxt = "";
@@ -315,6 +329,11 @@ private:
     static void start(void* ctx) {
         RTLSDRSourceModule* _this = (RTLSDRSourceModule*)ctx;
         if (_this->running) { return; }
+        if (_this->needsRefresh) {
+            _this->refresh();
+            _this->selectByName(_this->selectedDevName);
+            _this->needsRefresh = false;
+        }
         if (_this->selectedDevName == "") {
             flog::error("No device selected");
             return;
@@ -354,6 +373,7 @@ private:
         _this->asyncCount = (int)roundf(_this->sampleRate / (200 * 512)) * 512;
 
         _this->workerEnded = false;
+        _this->readResult = 0;
         _this->running = true;
         _this->workerThread = std::thread(&RTLSDRSourceModule::worker, _this);
         flog::info("RTLSDRSourceModule '{0}': Start!", _this->name);
@@ -364,7 +384,12 @@ private:
         if (!_this->running) { return; }
         _this->running = false;
         _this->stream.stopWriter();
-        rtlsdr_cancel_async(_this->openDev);
+        // Cancellation may race the worker entering read_async. Retry until its
+        // drain completes; never close a handle while the worker still owns it.
+        while (!_this->workerEnded.load()) {
+            rtlsdr_cancel_async(_this->openDev);
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
         if (_this->workerThread.joinable()) { _this->workerThread.join(); }
         _this->stream.clearWriteStop();
         rtlsdr_close(_this->openDev);
@@ -397,13 +422,7 @@ private:
 
     static void menuHandler(void* ctx) {
         RTLSDRSourceModule* _this = (RTLSDRSourceModule*)ctx;
-        if (_this->running && _this->workerEnded.load()) {
-            // USB removal ends async reading. Join and close on the UI thread.
-            gui::mainWindow.setPlayState(false);
-            stop(_this);
-            _this->refresh();
-            _this->selectByName(_this->selectedDevName);
-        }
+        _this->reconcileWorker();
 
         if (_this->running) { SmGui::BeginDisabled(); }
         SmGui::FillWidth();
@@ -579,9 +598,20 @@ private:
     }
 
     void worker() {
-        rtlsdr_reset_buffer(openDev);
-        rtlsdr_read_async(openDev, asyncHandler, this, 0, asyncCount);
+        int result = rtlsdr_reset_buffer(openDev);
+        if (result >= 0) { result = rtlsdr_read_async(openDev, asyncHandler, this, 0, asyncCount); }
+        readResult = result;
         workerEnded = true;
+    }
+
+    void reconcileWorker() {
+        if (!running || !workerEnded.load()) { return; }
+        flog::warn("RTL-SDR async stream ended: {0}", readResult.load());
+        // Run on the UI thread even with Source collapsed. Probe again only on
+        // an explicit start/refresh, after pending USB callbacks are drained.
+        needsRefresh = true;
+        gui::mainWindow.setPlayState(false);
+        stop(this);
     }
 
     static void asyncHandler(unsigned char* buf, uint32_t len, void* ctx) {
@@ -608,6 +638,9 @@ private:
     SourceManager::SourceHandler handler;
     bool running = false;
     std::atomic<bool> workerEnded{false};
+    std::atomic<int> readResult{0};
+    bool needsRefresh = false;
+    EventHandler<ImGuiContext*> waterfallDrawnHandler;
     double freq;
     std::string selectedDevName = "";
     int devId = 0;

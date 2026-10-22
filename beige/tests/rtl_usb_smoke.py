@@ -22,12 +22,20 @@ def main():
         assert 'running' in state, state
         return state
 
+    def playback(playing):
+        request('/sdr/start' if playing else '/sdr/stop')
+        for _ in range(300):
+            if json.loads(request('/sdr/status'))['playing'] == playing:
+                return
+            time.sleep(.02)
+        raise AssertionError('Playback transition did not finish')
+
     if args.interrupt:
         modules = json.loads(request('/modules'))
         expected = ['noise_reduction_logmmse', 'null_audio_sink', 'radio', 'rtl_sdr_source']
         assert sorted(value['module'] for value in modules.values()) == expected, 'Use only the isolated QA profile'
         request('/proc/null_audio_sink/select', 'Radio')
-    request('/sdr/stop')
+    playback(False)
     initial = device()
     assert initial['count'] > 0 and initial['gains'] > 0 and initial['selected'], initial
     for cycle in range(10):
@@ -36,18 +44,18 @@ def main():
         refreshed = device()
         assert refreshed['refreshes'] == before['refreshes'] + 1, refreshed
         assert refreshed['selected'] == initial['selected'] and refreshed['gains'] > 0, refreshed
-        request('/sdr/start')
+        playback(True)
         assert device()['running'], device()
         # A refresh request must not replace a handle owned by the read thread.
         request('/proc/source/RTL-SDR/device', 'refresh')
         active = device()
         assert active['running'] and active['refreshes'] == refreshed['refreshes'], active
         time.sleep(0.15)
-        request('/sdr/stop')
+        playback(False)
         assert not device()['running'], device()
     if args.interrupt:
         for cycle in range(10):
-            request('/sdr/start')
+            playback(True)
             before = int(request('/proc/null_audio_sink/samples'))
             for _ in range(150):
                 if int(request('/proc/null_audio_sink/samples')) > before:
@@ -64,9 +72,9 @@ def main():
             else:
                 raise AssertionError(('Reader ended but UI stayed active', state))
             assert state['worker_ended'] and state['read_result'] == 0, state
-        request('/sdr/start')
+        playback(True)
         assert device()['running'], device()
-        request('/sdr/stop')
+        playback(False)
     print(json.dumps({'passed_cycles': 10, 'interrupted_restarts': 10 if args.interrupt else 0, 'final': device()}))
 
 

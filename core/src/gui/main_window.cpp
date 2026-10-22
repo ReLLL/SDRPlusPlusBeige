@@ -2,6 +2,7 @@
 #include "imgui.h"
 #include <implot/implot.h>
 #include <gui/main_window.h>
+#include <http_debug_server.h>
 #include <gui/gui.h>
 #include "utils/usleep.h"
 #include "utils/cty.h"
@@ -928,6 +929,7 @@ void MainWindow::setPlayState(bool _playing) {
         sigpath::sourceManager.stop();
         sigpath::iqFrontEnd.flushInputBuffer();
     }
+    httpdebug::setSdrPlaying(playing);
 }
 
 bool MainWindow::sdrIsRunning() {
