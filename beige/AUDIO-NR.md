@@ -96,6 +96,8 @@ The final package passes all fourteen CTests, ABI/signature and Python/Ruff/whit
 
 Installed 1.3.24 also reaches Ready with active neural processing during normal-profile RTL-SDR reception. The previous audio-reducer selections were restored after that check. All Beige test instances exited cleanly and were left closed. Operator listening comparison of this correction remains pending.
 
+Operator checkpoint, October 22: Oz confirmed restored volume, though slightly more voice level would help. He prefers the neural background-noise suppression to NR2, but hears missing letters/voice fragments and sometimes clearer audio with NR2. This partially accepts level recovery and suppression, not speech preservation. Source baseline is `6dc2bafd`; preserve 1.3.24 as a fallback before trying clarity changes. Test quieter consonants and syllable onsets at matched speech level, and measure any background-noise tradeoff explicitly.
+
 ## Reproduction and sources
 
 ```bash
