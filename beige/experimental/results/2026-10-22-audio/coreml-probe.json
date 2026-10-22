@@ -1,0 +1,9 @@
+{
+  "prototype_cpu_percent": 21.05000000000001,
+  "inference_ms_median": 3.2000410137698054,
+  "inference_ms_p95": 3.7122835754416874,
+  "providers": [
+    "CoreMLExecutionProvider",
+    "CPUExecutionProvider"
+  ]
+}

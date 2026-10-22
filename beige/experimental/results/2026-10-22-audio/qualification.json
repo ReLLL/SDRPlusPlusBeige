@@ -1,0 +1,17 @@
+{
+  "version": "1.3.22",
+  "tests_passed": 12,
+  "abi_comparison": true,
+  "signature_verified": true,
+  "profile_json_preserved_during_install": 106,
+  "private_binary_files_preserved_during_install": 17,
+  "neural_default": "Off for missing preferences; existing Audio NR2 choice preserved",
+  "RF_qualification": "16 mode transitions, restart, mutual exclusion, finite audio; four-module isolated live RTL-SDR receiver",
+  "memory_regression": "Before: 3044838 outstanding array bytes after one destruction; after: zero after each of 32 cycles",
+  "native_latency_ms": 38.791666666666664,
+  "profiler": "Eight-second final 1.3.22 capture; verified PID, package/module paths and vmmap; expected NeuralVoiceNR, State::frame, Ort::Run and FFT frames symbolicated",
+  "listening_acceptance": "Pending operator comparison for new audio reducer; earlier Baseband acceptance remains separate",
+  "installation_backup": "/Users/ozzytasteppe/pro/sdrpp-beige/build-beige/installed-before-1.3.22.app.backup-20261022T063244128341Z",
+  "normal_startup": "Ready, HTTP disabled, latest saved 17.185 MHz AM and 2D retained; neural off",
+  "qa_shutdown": "Both isolated receivers exited zero"
+}

@@ -4,6 +4,8 @@ Read when: verifying the spectrum renderer, imported plugins or a packaged build
 
 ## Automated gate
 
+Audio NR2/neural audio qualification for 1.3.22 is in [AUDIO-NR.md](AUDIO-NR.md). The twelve-test gate includes normal/ASAN neural packet/backend/rate/bypass checks and an exact array-ownership regression for repeated Audio NR2 resets. Operator listening remains separate from controlled speech metrics.
+
 - Build all enabled stock modules and the core together.
 - `ctest --test-dir build-beige --output-on-failure`.
 - `python3 beige/check_plugin_abi.py`.

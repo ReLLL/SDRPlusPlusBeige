@@ -28,6 +28,17 @@ def package(build, brown_app=None, usb_prefix=None):
         (contents / directory).mkdir(parents=True)
     shutil.copytree(root / 'root/res', contents / 'Resources', dirs_exist_ok=True)
     shutil.copy2(root / 'license', contents / 'Resources/COPYING')
+    neural = build / 'neural-dependency'
+    if (neural / 'gtcrn.onnx').exists():
+        models = contents / 'Resources/models'
+        models.mkdir()
+        shutil.copy2(neural / 'gtcrn.onnx', models / 'gtcrn.onnx')
+        shutil.copy2(neural / 'GTCRN-LICENSE', contents / 'Resources/GTCRN-LICENSE')
+        shutil.copy2(neural / 'provenance.json', contents / 'Resources/neural-audio-provenance.json')
+        runtime = neural / 'onnxruntime-osx-arm64-1.31.0'
+        for name in ('LICENSE', 'ThirdPartyNotices.txt'):
+            if (runtime / name).exists():
+                shutil.copy2(runtime / name, contents / 'Resources' / ('ONNXRuntime-' + name))
     version_header = (root / 'core/src/version.h').read_text()
     version = re.search(r'VERSION_STR "([0-9.]+)', version_header)[1]
     build_number = re.search(r'BEIGE_BUILD_NUMBER (\d+)', version_header)[1]

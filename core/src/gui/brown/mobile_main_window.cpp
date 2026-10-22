@@ -3576,8 +3576,10 @@ void ConfigPanel::draw(ImGui::WaterfallVFO *vfo) {
     //    }
 
     if (afnr) {
-        if (ImGui::Checkbox("Mic NR##donr", &afnr->allowed)) {
-            setConfig("trx_afnrAllowd", afnr->allowed);
+        bool micNR = afnr->allowed.load();
+        if (ImGui::Checkbox("Mic NR##donr", &micNR)) {
+            afnr->allowed = micNR;
+            setConfig("trx_afnrAllowd", micNR);
         }
         ImGui::SameLine();
         ImGui::FillWidth();

@@ -1,4 +1,15 @@
 add_executable(beige_history_test history_test.cpp)
+add_executable(beige_audio_nr_memory_test audio_nr_memory_test.cpp
+    ../../misc_modules/noise_reduction_logmmse/src/omlsa_mcra/Datablock_Read.cpp
+    ../../misc_modules/noise_reduction_logmmse/src/omlsa_mcra/LSA_denoise.cpp
+    ../../misc_modules/noise_reduction_logmmse/src/omlsa_mcra/G_calculate.cpp
+    ../../misc_modules/noise_reduction_logmmse/src/omlsa_mcra/base4_fft.cpp
+    ../../misc_modules/noise_reduction_logmmse/src/omlsa_mcra/Cordic.cpp)
+target_include_directories(beige_audio_nr_memory_test PRIVATE "${SDRPP_CORE_ROOT}"
+    "${CMAKE_SOURCE_DIR}/misc_modules/noise_reduction_logmmse/src")
+target_compile_features(beige_audio_nr_memory_test PRIVATE cxx_std_17)
+target_compile_options(beige_audio_nr_memory_test PRIVATE $<$<CXX_COMPILER_ID:AppleClang,Clang,GNU>:-UNDEBUG>)
+add_test(NAME beige_audio_nr_memory COMMAND beige_audio_nr_memory_test "${CMAKE_SOURCE_DIR}/root/res")
 target_include_directories(beige_history_test PRIVATE "${SDRPP_CORE_ROOT}")
 target_compile_features(beige_history_test PRIVATE cxx_std_17)
 target_compile_options(beige_history_test PRIVATE $<$<CXX_COMPILER_ID:AppleClang,Clang,GNU>:-UNDEBUG>)
@@ -52,6 +63,42 @@ if(APPLE)
     target_link_libraries(beige_nr_lab_asan PRIVATE sdrpp_core)
 endif()
 target_compile_options(beige_nr_lab PRIVATE $<$<CXX_COMPILER_ID:AppleClang,Clang,GNU>:-UNDEBUG>)
+if(APPLE)
+    add_executable(beige_audio_nr_lab EXCLUDE_FROM_ALL ../experimental/audio_nr_lab.cpp
+        ../../misc_modules/noise_reduction_logmmse/src/omlsa_mcra.cpp
+        ../../misc_modules/noise_reduction_logmmse/src/omlsa_mcra/Datablock_Read.cpp
+        ../../misc_modules/noise_reduction_logmmse/src/omlsa_mcra/LSA_denoise.cpp
+        ../../misc_modules/noise_reduction_logmmse/src/omlsa_mcra/G_calculate.cpp
+        ../../misc_modules/noise_reduction_logmmse/src/omlsa_mcra/base4_fft.cpp
+        ../../misc_modules/noise_reduction_logmmse/src/omlsa_mcra/Cordic.cpp)
+    target_include_directories(beige_audio_nr_lab PRIVATE "${SDRPP_CORE_ROOT}"
+        "${SDRPP_CORE_ROOT}/imgui"
+        "${CMAKE_SOURCE_DIR}/misc_modules/noise_reduction_logmmse/src")
+    target_compile_features(beige_audio_nr_lab PRIVATE cxx_std_17)
+    target_include_directories(beige_audio_nr_lab PRIVATE ${VOLK_INCLUDE_DIRS})
+    target_link_directories(beige_audio_nr_lab PRIVATE ${VOLK_LIBRARY_DIRS})
+    target_link_libraries(beige_audio_nr_lab PRIVATE PkgConfig::BEIGE_NR_FFTW ${VOLK_LIBRARIES})
+    if(BEIGE_ONNXRUNTIME_ROOT)
+        find_library(BEIGE_TEST_ORT_LIBRARY NAMES onnxruntime PATHS "${BEIGE_ONNXRUNTIME_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
+        target_sources(beige_audio_nr_lab PRIVATE ../../misc_modules/noise_reduction_logmmse/src/neural_audio.cpp)
+        target_include_directories(beige_audio_nr_lab PRIVATE "${BEIGE_ONNXRUNTIME_ROOT}/include")
+        target_compile_definitions(beige_audio_nr_lab PRIVATE BEIGE_NEURAL_AUDIO=1)
+        target_link_libraries(beige_audio_nr_lab PRIVATE "${BEIGE_TEST_ORT_LIBRARY}" "-framework Accelerate")
+        foreach(neural_target beige_neural_audio_test beige_neural_audio_asan)
+            add_executable(${neural_target} neural_audio_test.cpp ../../misc_modules/noise_reduction_logmmse/src/neural_audio.cpp)
+            target_include_directories(${neural_target} PRIVATE "${SDRPP_CORE_ROOT}" "${SDRPP_CORE_ROOT}/imgui"
+                "${CMAKE_SOURCE_DIR}/misc_modules/noise_reduction_logmmse/src" "${BEIGE_ONNXRUNTIME_ROOT}/include" ${VOLK_INCLUDE_DIRS})
+            target_compile_features(${neural_target} PRIVATE cxx_std_17)
+            target_compile_definitions(${neural_target} PRIVATE BEIGE_NEURAL_AUDIO=1)
+            target_compile_options(${neural_target} PRIVATE -UNDEBUG)
+            target_link_directories(${neural_target} PRIVATE ${VOLK_LIBRARY_DIRS})
+            target_link_libraries(${neural_target} PRIVATE PkgConfig::BEIGE_NR_FFTW ${VOLK_LIBRARIES} "${BEIGE_TEST_ORT_LIBRARY}" "-framework Accelerate")
+            add_test(NAME ${neural_target} COMMAND ${neural_target} "${CMAKE_BINARY_DIR}/neural-dependency/gtcrn.onnx")
+        endforeach()
+        target_compile_options(beige_neural_audio_asan PRIVATE -fsanitize=address -fno-omit-frame-pointer)
+        target_link_options(beige_neural_audio_asan PRIVATE -fsanitize=address)
+    endif()
+endif()
 if(APPLE AND EXISTS "${CMAKE_BINARY_DIR}/beige_darwin_disconnect_test")
     add_test(NAME beige_usb_disconnect COMMAND "${CMAKE_BINARY_DIR}/beige_darwin_disconnect_test")
 endif()

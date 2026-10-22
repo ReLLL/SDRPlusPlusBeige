@@ -12,6 +12,7 @@
 #include "utils/arrays.h"
 #include "logmmse.h"
 #include "omlsa_mcra.h"
+#include "audio_cpu_meter.h"
 #include "utils/stream_tracker.h"
 
 namespace dsp {
@@ -70,7 +71,7 @@ namespace dsp {
         bool failed = false;
         dsp::omlsa_mcra omlsa_mcra;
         std::vector<stereo_t> buffer;
-        bool allowed = false;
+        std::atomic<bool> allowed{false};
         bool allowed2 = true;       // just convenient for various conditions
         float preAmpGain = 0.0f;
         int instanceCount = 0;
@@ -103,6 +104,7 @@ namespace dsp {
 
 
             omlsa_mcra.setSampleRate(48000);
+            cpuMeter.reset();
             sigpath::txState.bindHandler(&txHandler);
             block::start();
         }
@@ -110,10 +112,13 @@ namespace dsp {
         void stop() override {
             block::stop();
             sigpath::txState.unbindHandler(&txHandler);
+            cpuMeter.reset();
         }
 
         StreamTracker nrIn, nrOut;
         float scaled = 32767.0;      // amplitude shaper
+        std::atomic<float> displayedScaling{1};
+        AudioCpuMeter cpuMeter;
 
         void process(stereo_t *readBuf, int count, stereo_t *writeBuf, int &wrote) {
             auto mult = pow(10, preAmpGain/20);
@@ -151,6 +156,7 @@ namespace dsp {
                         }
                         scaled = newScaled;
                     }
+                    displayedScaling.store(32767.0f / scaled);
 //                    auto ctm = currentTimeNanos();
 //                    if (dumpIn) {
 //                        fwrite((short*)processIn.data(), 1, blockSize * sizeof(short), dumpIn);
@@ -186,7 +192,10 @@ namespace dsp {
 //            flog::info("Sample count: {}", count);
             int wrote;
 //            auto ctm = currentTimeMillis();
+            const auto cpuStart = AudioCpuMeter::now();
             process(_in->readBuf, count, out.writeBuf, wrote);
+            if (allowed && allowed2) cpuMeter.add(cpuStart, count, 48000);
+            else cpuMeter.reset();
             _in->flush();
 //            flog::info("afnr.omlsa_mcra: input = {}, output = {}", count, wrote);
             if (!out.swap(wrote)) {

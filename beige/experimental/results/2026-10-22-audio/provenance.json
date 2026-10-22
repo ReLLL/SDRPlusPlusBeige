@@ -1,0 +1,19 @@
+{
+  "installed_baseline": "a6671be4",
+  "onnxruntime": "1.31.0 native; 1.19.2 Python prototype",
+  "GTCRN": "502ebfab64da7c4a9af78dcb9c6ceef1ebb01c73",
+  "RNNoise": "70f1d256acd4b34a572f999a05c87bf00b67730d",
+  "model_sha256": "b4718df6228e7bdf1a8a435cf98f838636eb2fd331acabf86ba87c5192ebcb87",
+  "cpu": "Apple M2 Max",
+  "corpus": "One recorded OSR speaker in two excerpts; one macOS synthesized male voice",
+  "cases": "21 controlled noisy 300-2700 Hz cases; three clean cases. No off-air recordings.",
+  "memory_before": "Exact array-allocation test: 3044838 bytes leaked after one denoiser destruction; twenty resets grew RSS about 61 MB.",
+  "memory_after": "32 resets return outstanding array bytes to baseline; 20-reset RSS growth is allocator high-water retention, about 3.2 MB.",
+  "audio_nr2_ownership_fix": "Output byte-identical on retained clean speech input before/after cleanup; no suppression parameter changes.",
+  "limitations": [
+    "eSTOI/STOI and SI-SDR are proxies, not live listening acceptance",
+    "Core ML probe uses older ORT Python runtime; native shipped inference uses CPU provider and Apple FFT",
+    "Unpaced File-source whole-process CPU cannot establish real-time savings",
+    "Linked ONNX Runtime and VOLK libraries are not ASAN instrumented"
+  ]
+}

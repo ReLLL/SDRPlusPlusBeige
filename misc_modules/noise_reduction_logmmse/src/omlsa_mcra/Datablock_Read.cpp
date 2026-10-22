@@ -6,6 +6,13 @@ using namespace std;
 
 Datablock_Read::Datablock_Read(int sample_rate,short channels,int MaxDataLen)
 {
+    m_data_in = nullptr;
+    m_data_storage = nullptr;
+    m_process_storage = nullptr;
+    m_buffer = nullptr;
+    m_data_resize = nullptr;
+    m_DoubDataBuffer = nullptr;
+    m_data_out = nullptr;
 	m_channels = channels;
 	m_sample_rate = sample_rate;
 	m_derr_code=Initial(MaxDataLen);
@@ -171,30 +178,13 @@ short Datablock_Read::Data_procese(short* pInBuffer, short* pOutBuffer,int read_
 	 
 Datablock_Read::~Datablock_Read()
 {
-	if (!m_data_storage) {
-		delete[] m_data_storage;
-		m_data_storage = NULL;
-	}
-	if (!m_data_in) {
-		delete[] m_data_in;
-		m_data_in = NULL;
-	}
-	if (!m_data_resize) {
-		delete[] m_data_resize;
-		m_data_resize = NULL;
-	}
-	if (!m_buffer) {
-		delete[] m_buffer;
-		m_buffer = NULL;
-	}
-	if (!m_DoubDataBuffer) {
-		delete[] m_DoubDataBuffer;
-		m_DoubDataBuffer = NULL;
-	}
-	if (!m_data_out) {
-		delete[] m_data_out;
-		m_data_out = NULL;
-	}
+    delete[] m_data_in;
+    delete[] m_data_storage;
+    delete[] m_process_storage;
+    delete[] m_buffer;
+    delete[] m_data_resize;
+    delete[] m_DoubDataBuffer;
+    delete[] m_data_out;
 }
 
 

@@ -14,6 +14,38 @@ SDRPP_EXPORT char* sdrppResourcesDirectory;
 
 G_calculate::G_calculate()
 {
+    m_dataBuf = nullptr;
+    m_init_S_min = nullptr;
+    m_init_S = nullptr;
+    m_init_S_tmp = nullptr;
+    m_arr_temp = nullptr;
+    m_init_p1 = nullptr;
+    m_S_f = nullptr;
+    m_EN_cos = nullptr;
+    m_EN_sin = nullptr;
+    m_post_SNR = nullptr;
+    m_E_pr_SNR = nullptr;
+    m_pr_SNR = nullptr;
+    m_v = nullptr;
+    m_integra = nullptr;
+    m_Gh1 = nullptr;
+    m_G = nullptr;
+    m_q = nullptr;
+    m_pp = nullptr;
+    m_h_global = nullptr;
+    m_cosen = nullptr;
+    m_old_cosen = nullptr;
+    m_cosen_local = nullptr;
+    m_cosen_global = nullptr;
+    m_plocal = nullptr;
+    m_pglobal = nullptr;
+    m_ns_storage = nullptr;
+    m_abs_Y = nullptr;
+    m_M = nullptr;
+    m_int_value = nullptr;
+    m_expsub_value = nullptr;
+    m_G_value = nullptr;
+    m_lamda_d = nullptr;
 }
 short G_calculate::Initialize(int wlen) {
 	m_lwlen = wlen ;
@@ -353,132 +385,36 @@ short G_calculate::G_calculate_process(Complex_num* winData, int blockInd) {  //
 
 G_calculate::~G_calculate()
 {
-	if (!m_arr_temp) {
-		delete[] m_arr_temp;
-		m_arr_temp = NULL;
-	}
-	if (!m_S_f) {
-		delete[] m_S_f;
-		m_S_f = NULL;
-	}
-
-	if (!m_abs_Y) {
-		delete[] m_abs_Y;
-		m_abs_Y = NULL;
-	}
-	if (!m_dataBuf) {
-		delete[] m_dataBuf;
-		m_dataBuf = NULL;
-	}
-	if (!m_init_S) {
-		delete[] m_init_S;
-		m_init_S = NULL;
-	}
-	if (!m_init_S_min) {
-		delete[] m_init_S_min;
-		m_init_S_min = NULL;
-	}
-	if (!m_init_S_tmp) {
-		delete[] m_init_S_tmp;
-		m_init_S_tmp = NULL;
-	}
-	if (!m_init_p1) {
-		delete[] m_init_p1;
-		m_init_p1 = NULL;
-	}
-	if (!m_EN_cos) {
-		delete[] m_EN_cos;
-		m_EN_cos = NULL;
-	}
-	if (!m_EN_sin) {
-		delete[] m_EN_sin;
-		m_EN_sin = NULL;
-	}
-	if (!m_post_SNR) {
-		delete[] m_post_SNR;
-		m_post_SNR = NULL;
-	}
-	if (!m_pr_SNR) {
-		delete[] m_pr_SNR;
-		m_pr_SNR = NULL;
-	}
-	if (!m_E_pr_SNR) {
-		delete[] m_E_pr_SNR;
-		m_E_pr_SNR = NULL;
-	}
-	if (!m_v) {
-		delete[] m_v;
-		m_v = NULL;
-	}
-	if (!m_Gh1) {
-		delete[] m_Gh1;
-		m_Gh1 = NULL;
-	}
-	if (!m_q) {
-		delete[] m_q;
-		m_q = NULL;
-	}
-	if (!m_pp) {
-		delete[] m_pp;
-		m_pp = NULL;
-	}
-
-	if (!m_G) {
-		delete[] m_G;
-		m_G = NULL;
-	}
-
-	if (!m_M) {
-		delete[] m_M;
-		m_M = NULL;
-	}
-
-	if (!m_ns_storage) {
-		delete[] m_ns_storage;
-		m_ns_storage = NULL;
-	}
-	if (!m_cosen_local) {
-		delete[] m_cosen_local;
-		m_cosen_local = NULL;
-	}
-	if (!m_cosen_global) {
-		delete[] m_cosen_global;
-		m_cosen_global = NULL;
-	}
-	if (!m_plocal) {
-		delete[] m_plocal;
-		m_plocal = NULL;
-	}
-	if (!m_pglobal) {
-		delete[] m_pglobal;
-		m_pglobal = NULL;
-	}
-	if (!m_h_global) {
-		delete[] m_h_global;
-		m_h_global = NULL;
-	}
-	if (!m_cosen) {
-		delete[] m_cosen;
-		m_cosen = NULL;
-	}
-	if (!m_old_cosen) {
-		delete[] m_old_cosen;
-		m_old_cosen = NULL;
-	}
-	if (!m_int_value) {
-		delete[] m_int_value;
-		m_int_value = NULL;
-	}
-	if (!m_expsub_value) {
-		delete[] m_expsub_value;
-		m_expsub_value = NULL;
-	}
-	if (!m_G_value) {
-		delete[] m_G_value;
-		m_G_value = NULL;
-	}
-	if (!m_lamda_d) {
-		delete[] m_lamda_d;
-		m_lamda_d = NULL;
-	}
+    delete[] m_dataBuf;
+    delete[] m_init_S_min;
+    delete[] m_init_S;
+    delete[] m_init_S_tmp;
+    delete[] m_arr_temp;
+    delete[] m_init_p1;
+    delete[] m_S_f;
+    delete[] m_EN_cos;
+    delete[] m_EN_sin;
+    delete[] m_post_SNR;
+    delete[] m_E_pr_SNR;
+    delete[] m_pr_SNR;
+    delete[] m_v;
+    delete[] m_integra;
+    delete[] m_Gh1;
+    delete[] m_G;
+    delete[] m_q;
+    delete[] m_pp;
+    delete[] m_h_global;
+    delete[] m_cosen;
+    delete[] m_old_cosen;
+    delete[] m_cosen_local;
+    delete[] m_cosen_global;
+    delete[] m_plocal;
+    delete[] m_pglobal;
+    delete[] m_ns_storage;
+    delete[] m_abs_Y;
+    delete[] m_M;
+    delete[] m_int_value;
+    delete[] m_expsub_value;
+    delete[] m_G_value;
+    delete[] m_lamda_d;
 }

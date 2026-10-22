@@ -1,0 +1,73 @@
+# Audio noise reduction
+
+Read when: changing Audio NR2, neural voice NR, audio CPU/scaling labels, model packaging or audio-rate conversion.
+
+## Controls in 1.3.22
+
+Audio NR2 keeps its existing OM-LSA/MCRA suppression method and checkbox. Its changing number is now labeled `Scaling: Nx`: the inverse of the float-to-int16 amplitude scale, relative to 32767. It is not a CPU counter. A separate `% cpu` line measures DSP-thread CPU time per second of input audio, averaged over at least half a second. An idle reducer has no current CPU reading. The Baseband NR meter remains its existing processing-wall-time estimate; the two counters have different definitions.
+
+Neural Voice NR is a separate checkbox for each radio, off by default. It selects the local GTCRN speech model. Selecting it turns Audio NR2 off for that radio, and selecting Audio NR2 turns the neural reducer off. Baseband NR remains independent and retains its existing combobox. Start comparisons with Baseband NR off so the audio methods can be heard separately.
+
+The neural option processes USB, LSB, AM, DSB and NFM audio. CW, RAW and WFM bypass it while retaining the checkbox preference. Digital payloads in USB/LSB cannot be identified by modulation alone: leave speech reduction off for those signals. It is a speech reducer, not a general music, CW or digital decoder filter.
+
+The model uses mono 16 kHz audio and 256-sample inference hops. A bounded polyphase FIR converts the actual radio audio rate to/from 16 kHz, supporting ordinary rates from 8 to 192 kHz. Left/right speech is averaged and restored as dual mono. The FIR, STFT overlap and fixed FIFO preserve exactly one output sample per input sample. Startup uses aligned dry/wet audio and a 100 ms fade into reduction. The native 48 kHz fixtures measure 1,862 samples, or 38.8 ms, of processing delay before device buffers. Enabling/disabling changes audio latency; this is not a sample-synchronous blind switch against unprocessed audio.
+
+## Method selection and measured quality
+
+The offline comparison uses 24 controlled cases: seven noise conditions for three voice excerpts, plus three clean cases. The voice material is two excerpts from one recorded Open Speech Repository speaker and one macOS synthesized male voice. Audio is limited to 300-2700 Hz. Conditions include white noise at 0/-5 dB, colored/stepped noise, impulses, a wandering tone and fading speech. All algorithms receive the same input. Integer delay is compensated before scoring; no spectral equalization or per-case parameter tuning is applied.
+
+Means over the 21 noisy cases, actual native wrappers on this M2 Max:
+
+| Method | eSTOI | STOI | SI-SDR, dB | Median NR CPU, one core |
+|---|---:|---:|---:|---:|
+| Off | 0.3684 | 0.6271 | -1.80 | - |
+| Audio NR2 | 0.3554 | 0.5762 | 4.64 | 0.26% |
+| Stock RNNoise | 0.2980 | 0.6028 | 1.40 | 1.09% |
+| Native GTCRN | 0.3937 | 0.6942 | 7.17 | 3.04% |
+
+GTCRN improves the average speech metrics here, at more CPU cost than Audio NR2. Stock RNNoise attenuates too much wanted speech in this narrowband set and is not included in the receiver. GTCRN is not a universal winner: individual cases regress, and its clean-speech eSTOI ranges from 0.866 to 0.943. It also reduces projected wanted-speech level by about 5.1 dB on average in the noisy cases. It remains an optional listening choice. These metrics are proxies, not QSO word accuracy, human listening approval or measured off-air performance.
+
+Raw results, provenance and qualification limits: [`experimental/results/2026-10-22-audio`](experimental/results/2026-10-22-audio/). Local level-matched listening clips remain under `/tmp/beige-audio-nr-20261022/native/`; corpus audio is not bundled or committed.
+
+## Acceleration and fallback
+
+The native engine uses ONNX Runtime's ARM CPU kernels, VOLK SIMD for the resamplers and the existing Apple Accelerate FFT backend for its 512-point STFT. If Apple FFT setup is unavailable, the same transform uses FFTW. Tests compare the two outputs and packet sizes. The model/session and all recurring tensor/FFT/FIR/FIFO storage are prepared outside steady-state frame processing. Inference uses one thread without a spinning thread pool. Session creation is lazy on the audio worker, so it does not block the UI thread; the first enable has a short warmup.
+
+A separate Python ONNX Runtime 1.19.2 experiment tested Core ML on the same small streaming graph. It fragmented into 65 supported partitions and used about 21% of one core, with median inference time 3.20 ms, versus about 3.1% for CPU execution in that prototype. This does not establish every Core ML version's performance. Shipped native inference uses ONNX Runtime 1.31.0 with the CPU provider. No claim of GPU or Neural Engine execution is made. The acceleration choice follows measured cost and audio parity rather than hardware availability alone.
+
+The private builder pins ONNX Runtime 1.31.0's official ARM64 archive and the upstream GTCRN commit/model SHA-256. Packaging includes the runtime dependency closure, model, provenance and both projects' licenses. No model download or cloud audio transfer occurs during reception. Missing/invalid models or processing errors bypass the neural reducer and show `Unavailable; bypassed`. Builds without the optional runtime retain the existing noise reducers.
+
+## Audio NR2 findings and practical next work
+
+The wrapper currently batches 4,608 samples at its assumed 48 kHz rate, or 96 ms, uses int16 conversion and allocates temporary vectors on processed blocks. These are implementation costs, not requirements of OM-LSA/MCRA. A float implementation with verified gain/noise-estimator equations, smaller streaming buffers and the actual audio rate is a realistic next experiment. Retune suppression floors and speech-presence smoothing against weak consonants and fading, rather than judging success by a quieter background alone. The current lookup implementation includes a strong speech-absence floor; changing that also requires qualifying or regenerating its gain lookup.
+
+Restart testing reproduced an ownership bug: the four numerical classes only freed pointers when they were null, and two arrays were omitted. One denoiser destruction leaked exactly 3,044,838 array bytes. Twenty resets grew resident memory by about 61 MB. Version 1.3.22 initializes owned pointers and frees all arrays. A regression fails before the fix and requires zero outstanding array bytes after each of 32 construction/process/destruction cycles. The retained speech output is byte-identical before/after the ownership correction. The existing 8,000-block AddressSanitizer test also passes. The numerical suppression parameters are unchanged.
+
+DeepFilterNet3 is a credible higher-cost comparison candidate, with an upstream Rust/C API and pretrained weights. Its published full-band speech results are not radio qualification. The initial native research build ran out of disk space while resolving optional training dependencies; generated research-only download/cache data was removed. No DeepFilterNet quality/CPU result is claimed here. A later comparison should use a minimal inference build and independent radio speech, including multiple languages and genuine RFI/fading captures.
+
+## Receiver qualification
+
+Version 1.3.21 was an isolated QA build for the neural engine and CPU/scaling controls. It passed 16 File-source modulation transitions, reducer mutual exclusion, finite-audio checks, restart and native UI inspection. Version 1.3.22 adds Audio NR2 ownership cleanup and its regression; the neural DSP is unchanged. The final package passes all twelve CTests, the Brown ABI comparison and complete app signature verification.
+
+The final four-module RTL-SDR/Radio/NR/NullAudioSink receiver also passes 16 modulation transitions, reducer mutual exclusion, finite audio and stop/start. Input is 3.2 MS/s with fourfold decimation to 800 kS/s; audio is 48 kHz. Matched full-history 3D intervals measure 17.5-17.7% of one core with audio NR off, 17.6% with Audio NR2, and 23.5% with Neural Voice NR. Median UI rates are 109-114 FPS across those intervals, with 46-47 history rows. Neural worker CPU reads 4.08%; Audio NR2 reads 0.25%. These short local results exclude the normal private decoder/plugin workload and depend on RF content, display refresh and background activity. They establish ongoing audio and responsive rendering in this setup, not live listening quality.
+
+An eight-second Time Profiler capture targets the final 1.3.22 RF process with verified binary/module paths and a live `vmmap`. Symbolication finds the expected neural worker, frame processing, ONNX Runtime Run and FFT calls. Frame counts confirm the exercised path; they are not CPU percentages. Raw traces and private startup/installation receipts remain outside Git. Both isolated receiver processes exited cleanly after testing.
+
+Installed 1.3.22 preserves all 106 private-profile JSON files and 17 private binary files, including retained backups, byte-for-byte during replacement. The prior 1.3.20 app is preserved under `build-beige/installed-before-1.3.22.app.backup-20261022T063244128341Z`. Normal startup reaches Ready with HTTP disabled, retains the latest saved 17.185 MHz AM tune and 2D view, and leaves Neural Voice NR off. The normal profile was not used for synthetic audio. Operator comparison of the new audio option is pending; earlier Baseband acceptance does not qualify this separate neural method.
+
+## Reproduction and sources
+
+```bash
+python3 beige/build_neural_audio.py build-beige
+bash beige/build-macos.sh
+cmake --build build-beige --target beige_audio_nr_lab
+python3 beige/tests/audio_nr_smoke.py --url http://127.0.0.1:18873 \
+  --pid <verified-isolated-receiver-pid> --output /tmp/audio-rf.json
+```
+
+- [GTCRN official implementation, model and streaming inference](https://github.com/Xiaobin-Rong/gtcrn).
+- [RNNoise official source and model training description](https://github.com/xiph/rnnoise).
+- [OM-LSA/MCRA original paper](https://webee.technion.ac.il/Sites/People/IsraelCohen/Publications/sp_Nov2001.pdf).
+- [DeepFilterNet official implementation and C API](https://github.com/Rikorose/DeepFilterNet); [published speech enhancement results](https://arxiv.org/abs/2305.08227).
+- [ONNX Runtime Core ML provider, supported operators and configuration](https://onnxruntime.ai/docs/execution-providers/CoreML-ExecutionProvider.html).
+- [Open Speech Repository source and attribution](https://www.voiptroubleshooter.com/open_speech/american.html).

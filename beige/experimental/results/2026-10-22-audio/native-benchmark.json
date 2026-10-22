@@ -1,0 +1,11 @@
+{
+  "method": "gtcrn",
+  "input_samples": 456000,
+  "output_samples": 456000,
+  "repeats": 20,
+  "processing_cpu_seconds": 5.84856,
+  "initialization_cpu_seconds": 0.033403,
+  "one_core_percent": 3.07819,
+  "frame_samples": 1984,
+  "total_written": 9120000
+}

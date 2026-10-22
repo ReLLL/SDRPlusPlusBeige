@@ -15,6 +15,9 @@
 #include "if_nr.h"
 #include "af_nr.h"
 #include "baseband_mode.h"
+#ifdef BEIGE_NEURAL_AUDIO
+#include "neural_audio.h"
+#endif
 #include <http_debug_server.h>
 
 using namespace ImGui;
@@ -36,6 +39,9 @@ class NRModule : public ModuleManager::Instance {
 
     std::unordered_map<std::string, std::shared_ptr<dsp::AFNRLogMMSE>> afnrProcessors;      // instance by radio name.
     std::unordered_map<std::string, std::shared_ptr<dsp::AFNR_OMLSA_MCRA>> afnrProcessors2; // instance by radio name.
+#ifdef BEIGE_NEURAL_AUDIO
+    std::unordered_map<std::string, std::shared_ptr<dsp::NeuralVoiceNR>> neuralProcessors;
+#endif
 
 public:
     NRModule(std::string name) {
@@ -144,6 +150,14 @@ private:
             if (!sigpath::vfoManager.vfoExists(radio)) continue;
             int mode = -1;
             core::modComManager.callInterface(radio, RADIO_IFACE_CMD_GET_MODE, nullptr, &mode);
+#ifdef BEIGE_NEURAL_AUDIO
+            auto neural = neuralProcessors.find(radio);
+            if (neural != neuralProcessors.end()) {
+                neural->second->voiceMode = mode == RADIO_IFACE_MODE_USB || mode == RADIO_IFACE_MODE_LSB
+                    || mode == RADIO_IFACE_MODE_AM || mode == RADIO_IFACE_MODE_DSB || mode == RADIO_IFACE_MODE_NFM;
+                neural->second->sampleRate = int(sigpath::sinkManager.getStreamSampleRate(radio));
+            }
+#endif
             modes.push_back(mode);
             if (radio == gui::waterfall.selectedVFO) selected = mode;
         }
@@ -185,10 +199,48 @@ private:
 
         afnromlsa->allowed = afnr2;
 
+#ifdef BEIGE_NEURAL_AUDIO
+        auto neural = std::make_shared<dsp::NeuralVoiceNR>();
+        neural->init(nullptr);
+        neural->modelPath = std::string(sdrppResourcesDirectory) + "/models/gtcrn.onnx";
+        neural->sampleRate = int(sigpath::sinkManager.getStreamSampleRate(instanceName));
+        config.acquire();
+        neural->allowed = config.conf.value("NeuralVoiceNR_" + instanceName, false);
+        config.release();
+        // Preserve an existing Audio NR2 choice if a saved profile enables both.
+        if (afnr2) neural->allowed = false;
+        neuralProcessors[instanceName] = neural;
+        core::modComManager.callInterface(instanceName, RADIO_IFACE_CMD_ADD_TO_AFCHAIN, neural.get(), nullptr);
+        core::modComManager.callInterface(instanceName, neural->allowed ? RADIO_IFACE_CMD_ENABLE_IN_AFCHAIN
+            : RADIO_IFACE_CMD_DISABLE_IN_AFCHAIN, neural.get(), nullptr);
+#endif
+        const std::string endpoint = "/modules/noise_reduction_logmmse/" + name + "/audio/" + instanceName;
+        httpdebug::procfs::registerEndpoint(endpoint + "/nr2", [afnromlsa]() { return afnromlsa->allowed ? "true" : "false"; },
+            [this, instanceName](const std::string& value) { setAudioNR2(instanceName, value == "true" || value == "1"); }, httpdebug::procfs::Type::Bool);
+        httpdebug::procfs::registerEndpoint(endpoint + "/nr2_cpu", [afnromlsa]() { return std::to_string(afnromlsa->cpuMeter.percent.load()); }, nullptr, httpdebug::procfs::Type::String);
+        httpdebug::procfs::registerEndpoint(endpoint + "/scaling", [afnromlsa]() { return std::to_string(afnromlsa->displayedScaling.load()); }, nullptr, httpdebug::procfs::Type::String);
+#ifdef BEIGE_NEURAL_AUDIO
+        httpdebug::procfs::registerEndpoint(endpoint + "/neural", [neural]() { return neural->allowed ? "true" : "false"; },
+            [this, instanceName](const std::string& value) { setNeural(instanceName, value == "true" || value == "1"); }, httpdebug::procfs::Type::Bool);
+        httpdebug::procfs::registerEndpoint(endpoint + "/neural_cpu", [neural]() { return std::to_string(neural->cpuMeter.percent.load()); }, nullptr, httpdebug::procfs::Type::String);
+        httpdebug::procfs::registerEndpoint(endpoint + "/neural_status", [neural]() {
+            return !neural->voiceMode ? "Mode bypass" : neural->status < 0 ? "Unavailable; bypassed" : neural->status == 1 ? "Ready" : "Idle";
+        }, nullptr, httpdebug::procfs::Type::String);
+#endif
+
         actuateAFNR();
     }
 
     void detachAFFromRadio(const std::string& instanceName) {
+        const std::string endpoint = "/modules/noise_reduction_logmmse/" + name + "/audio/" + instanceName;
+        for (const auto* suffix : {"/nr2", "/nr2_cpu", "/scaling", "/neural", "/neural_cpu", "/neural_status"}) httpdebug::procfs::unregister(endpoint + suffix);
+#ifdef BEIGE_NEURAL_AUDIO
+        auto neural = neuralProcessors.find(instanceName);
+        if (neural != neuralProcessors.end()) {
+            core::modComManager.callInterface(instanceName, RADIO_IFACE_CMD_REMOVE_FROM_AFCHAIN, neural->second.get(), nullptr);
+            neuralProcessors.erase(neural);
+        }
+#endif
         if (afnrProcessors.find(instanceName) != afnrProcessors.end()) {
             core::modComManager.callInterface(instanceName, RADIO_IFACE_CMD_REMOVE_FROM_IFCHAIN,
                                               afnrProcessors[instanceName].get(), NULL);
@@ -258,6 +310,9 @@ private:
             for (const auto& radio : names) detachAFFromRadio(radio);
             afnrProcessors.clear();
             afnrProcessors2.clear();
+#ifdef BEIGE_NEURAL_AUDIO
+            neuralProcessors.clear();
+#endif
             ImGui::onSNRMeterExtPoint.unbindHandler(&snrMeterExtPointHandler);
             gui::mainWindow.onWaterfallDrawn.unbindHandler(&waterfallDrawnHandler);
         }
@@ -299,6 +354,31 @@ private:
             sigpath::iqFrontEnd.togglePreprocessor(&ifnrProcessor, shouldRun);
         }
     }
+
+    void setAudioNR2(const std::string& radio, bool value) {
+#ifdef BEIGE_NEURAL_AUDIO
+        if (value) setNeural(radio, false);
+#endif
+        afnrProcessors2.at(radio)->allowed = value;
+        config.acquire();
+        config.conf["AF_NR2_" + radio] = value;
+        config.release(true);
+    }
+
+#ifdef BEIGE_NEURAL_AUDIO
+    void setNeural(const std::string& radio, bool value) {
+        auto neural = neuralProcessors.at(radio);
+        if (value) afnrProcessors2.at(radio)->allowed = false;
+        if (value && neural->status < 0) neural->status = 0;
+        neural->allowed = value;
+        core::modComManager.callInterface(radio, value ? RADIO_IFACE_CMD_ENABLE_IN_AFCHAIN : RADIO_IFACE_CMD_DISABLE_IN_AFCHAIN,
+            neural.get(), nullptr);
+        config.acquire();
+        config.conf["NeuralVoiceNR_" + radio] = value;
+        if (value) config.conf["AF_NR2_" + radio] = false;
+        config.release(true);
+    }
+#endif
 
     void menuHandler() {
         float menuWidth = ImGui::GetContentRegionAvail().x;
@@ -374,14 +454,26 @@ private:
         }
 
         for (auto [k, v] : afnrProcessors2) {
-            if (ImGui::Checkbox(("Audio NR2 " + k + "##_radio_omlsa_nr_" + k).c_str(), &v->allowed)) {
-                actuateAFNR();
-                config.acquire();
-                config.conf["AF_NR2_" + k] = v->allowed;
-                config.release(true);
-            }
+            bool audioNR2 = v->allowed.load();
+            if (ImGui::Checkbox(("Audio NR2 " + k + "##_radio_omlsa_nr_" + k).c_str(), &audioNR2)) setAudioNR2(k, audioNR2);
             ImGui::SameLine();
-            ImGui::Text("%0.01f", 32767.0 / v->scaled);
+            ImGui::Text("Scaling: %0.01fx", v->displayedScaling.load());
+            if (v->allowed && v->cpuMeter.percent.load() >= 0) {
+                ImGui::TextDisabled("%.1f%% cpu", v->cpuMeter.percent.load());
+            }
+#ifdef BEIGE_NEURAL_AUDIO
+            auto neural = neuralProcessors.at(k);
+            bool voice = neural->allowed.load();
+            if (ImGui::Checkbox(("Neural Voice NR " + k + "##neural_" + k).c_str(), &voice)) setNeural(k, voice);
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Local GTCRN speech reduction. Off by default.\nEnabling selects it instead of Audio NR2 for this radio.\nCW, RAW and WFM bypass it. For USB/LSB digital signals, leave it off.\nCPU SIMD and optional Apple FFT; portable FFT fallback.");
+            if (voice) {
+                if (!neural->voiceMode) ImGui::TextDisabled("Bypassed for this mode");
+                else if (neural->status < 0) ImGui::TextDisabled("Unavailable; bypassed");
+                else if (neural->cpuMeter.percent.load() >= 0) ImGui::TextDisabled("%.1f%% cpu | %s", neural->cpuMeter.percent.load(),
+                    neural->appleFFT ? "CPU SIMD + Apple FFT" : "CPU SIMD + FFTW");
+                else ImGui::TextDisabled("Starting voice reduction...");
+            }
+#endif
         }
         if (ImGui::Checkbox(("SNR Chart##_radio_logmmse_nr_" + name).c_str(), &snrChartWidget)) {
             config.acquire();

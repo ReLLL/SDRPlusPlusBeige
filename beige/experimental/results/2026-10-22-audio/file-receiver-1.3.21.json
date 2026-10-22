@@ -1,0 +1,102 @@
+{
+  "performance": [
+    {
+      "method": "off",
+      "fps_median": 69.96899795532227,
+      "history_rows_median": 63.0,
+      "whole_process_cpu_percent": 407.33865431410345,
+      "audio_worker_cpu_median": null,
+      "scaling": 1.0
+    },
+    {
+      "method": "nr2",
+      "fps_median": 72.5333137512207,
+      "history_rows_median": 64.0,
+      "whole_process_cpu_percent": 360.5194752470854,
+      "audio_worker_cpu_median": 0.8534539999999999,
+      "scaling": 4.600889
+    },
+    {
+      "method": "neural",
+      "fps_median": 72.05513000488281,
+      "history_rows_median": 63.0,
+      "whole_process_cpu_percent": 235.50070904343406,
+      "audio_worker_cpu_median": 5.7707774999999994,
+      "scaling": 4.556107
+    },
+    {
+      "method": "off",
+      "fps_median": 67.27003860473633,
+      "history_rows_median": 64.0,
+      "whole_process_cpu_percent": 437.68381815343116,
+      "audio_worker_cpu_median": null,
+      "scaling": 4.556107
+    }
+  ],
+  "transitions": [
+    {
+      "repeat": 0,
+      "mode": "USB"
+    },
+    {
+      "repeat": 0,
+      "mode": "LSB"
+    },
+    {
+      "repeat": 0,
+      "mode": "AM"
+    },
+    {
+      "repeat": 0,
+      "mode": "DSB"
+    },
+    {
+      "repeat": 0,
+      "mode": "NFM"
+    },
+    {
+      "repeat": 0,
+      "mode": "CW"
+    },
+    {
+      "repeat": 0,
+      "mode": "RAW"
+    },
+    {
+      "repeat": 0,
+      "mode": "WFM"
+    },
+    {
+      "repeat": 1,
+      "mode": "USB"
+    },
+    {
+      "repeat": 1,
+      "mode": "LSB"
+    },
+    {
+      "repeat": 1,
+      "mode": "AM"
+    },
+    {
+      "repeat": 1,
+      "mode": "DSB"
+    },
+    {
+      "repeat": 1,
+      "mode": "NFM"
+    },
+    {
+      "repeat": 1,
+      "mode": "CW"
+    },
+    {
+      "repeat": 1,
+      "mode": "RAW"
+    },
+    {
+      "repeat": 1,
+      "mode": "WFM"
+    }
+  ]
+}

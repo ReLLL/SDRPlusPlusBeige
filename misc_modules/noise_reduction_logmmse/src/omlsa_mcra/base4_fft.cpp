@@ -2,7 +2,19 @@
 #include <math.h>
 #include<iostream>
 
-MY_B4_FFT::MY_B4_FFT() {
+MY_B4_FFT::MY_B4_FFT()
+{
+    m_Buffer_cos = nullptr;
+    m_Buffer_sin = nullptr;
+    m_sort4_count = nullptr;
+    m_e1_position = nullptr;
+    m_o1_position = nullptr;
+    m_e2_position = nullptr;
+    m_o2_position = nullptr;
+    m_yr = nullptr;
+    m_yi = nullptr;
+    m_sort_temp_r = nullptr;
+    m_sort_temp_i = nullptr;
 }
 
 short MY_B4_FFT::initial(int N) {
@@ -176,51 +188,19 @@ short MY_B4_FFT::base4_fft(Complex_num *x, int sign) {
 	return 0;
 }
 
-MY_B4_FFT::~MY_B4_FFT() {
-	if (!m_Buffer_cos) {
-		delete[] m_Buffer_cos;
-		m_Buffer_cos = NULL;
-	}
-	if (!m_Buffer_sin) {
-		delete[] m_Buffer_sin;
-		m_Buffer_sin = NULL;
-	}
-	if (!m_sort4_count) {
-		delete[] m_sort4_count;
-		m_sort4_count = NULL;
-	}
-	if (!m_sort_temp_r) {
-		delete[] m_sort_temp_r;
-		m_sort_temp_r = NULL;
-	}
-	if (!m_sort_temp_i) {
-		delete[] m_sort_temp_i;
-		m_sort_temp_i = NULL;
-	}
-	if (!m_e1_position) {
-		delete[] m_e1_position;
-		m_e1_position = NULL;
-	}
-	if (!m_o1_position) {
-		delete[] m_o1_position;
-		m_o1_position = NULL;
-	}
-	if (!m_yr) {
-		delete[] m_yr;
-		m_yr = NULL;
-	}
-	if (!m_e2_position) {
-		delete[] m_e2_position;
-		m_e2_position = NULL;
-	}
-	if (!m_o2_position) {
-		delete[] m_o2_position;
-		m_o2_position = NULL;
-	}
-	if (!m_yi) {
-		delete[] m_yi;
-		m_yi = NULL;
-	}
+MY_B4_FFT::~MY_B4_FFT()
+{
+    delete[] m_Buffer_cos;
+    delete[] m_Buffer_sin;
+    delete[] m_sort4_count;
+    delete[] m_e1_position;
+    delete[] m_o1_position;
+    delete[] m_e2_position;
+    delete[] m_o2_position;
+    delete[] m_yr;
+    delete[] m_yi;
+    delete[] m_sort_temp_r;
+    delete[] m_sort_temp_i;
 }
 
 void MY_B4_FFT::fftfix(Complex_num *x, int sign) {

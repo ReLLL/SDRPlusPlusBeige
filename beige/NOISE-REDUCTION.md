@@ -12,7 +12,11 @@ Close all Beige instances when testing is finished unless Oz explicitly requests
 
 [Offline research and reproducible results](experimental/NR-RESEARCH.md) compare fourteen LogMMSE variants on controlled speech IQ plus CW/AM/BPSK checks. Frame-clock/Wiener improved held-out mean eSTOI by 0.0165 at 800 kS/s, repeating the 0.0166 gain at 204.8 kS/s. Measured NR CPU fell from 13.23% to 8.36% of one M2 Max core at 800 kS/s with 1,984-sample packets. A packet-size-dependent noise-update clock was reproduced; frame-based updates eliminate that difference in the tests. The research preceded 1.3.20, which now offers this candidate for SSB voice after the receiver checks below. Other variants remain experimental. No live listening approval or digital-decoder gain is claimed.
 
-## Current receiver: 1.3.20
+## Current audio addition: 1.3.22
+
+[Audio NR research and qualification](AUDIO-NR.md) adds a separate, default-off Neural Voice NR checkbox using GTCRN, CPU SIMD and Apple FFT with portable fallback. Audio NR2 retains its suppression method and now shows `Scaling: Nx` plus a separate actual DSP-thread `% cpu` reading. Its numerical ownership leak is corrected without changing the suppression parameters. Baseband NR's accepted combobox and preferences remain unchanged.
+
+## Accepted Baseband receiver: 1.3.20
 
 [Modulation-aware Baseband NR](BASEBAND-MODES.md) adds Automatic (mode), Original LogMMSE and Digital / bypass. Automatic uses the measured frame-clock/Wiener path for USB/LSB voice, keeps Original for AM/CW/DSB, and bypasses FM/raw. Shared radio VFOs use the safer common setting. USB/LSB digital payloads require Digital / bypass; modulation alone cannot identify them. The existing Baseband NR enabled state and optional math setting are preserved. Original remains the immediate fallback.
 
