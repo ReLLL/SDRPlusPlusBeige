@@ -9,6 +9,7 @@
 #include <core.h>
 #include <imgui/imgui_internal.h>
 #include <vector>
+#include <tuple>
 #include <gui/widgets/snr_meter.h>
 #include "signal_path/signal_path.h"
 #include <radio_interface.h>
@@ -18,6 +19,7 @@
 #ifdef BEIGE_NEURAL_AUDIO
 #include "neural_audio.h"
 #include "neural_model_path.h"
+#include "neural_clarity.h"
 #endif
 #include <http_debug_server.h>
 
@@ -207,6 +209,7 @@ private:
         neural->sampleRate = int(sigpath::sinkManager.getStreamSampleRate(instanceName));
         config.acquire();
         neural->allowed = config.conf.value("NeuralVoiceNR_" + instanceName, false);
+        neural->clarityOptions = config.conf.value("NeuralClarity_" + instanceName, 0u) & dsp::NeuralClarity::All;
         config.release();
         // Preserve an existing Audio NR2 choice if a saved profile enables both.
         if (afnr2) neural->allowed = false;
@@ -224,6 +227,11 @@ private:
         httpdebug::procfs::registerEndpoint(endpoint + "/neural", [neural]() { return neural->allowed ? "true" : "false"; },
             [this, instanceName](const std::string& value) { setNeural(instanceName, value == "true" || value == "1"); }, httpdebug::procfs::Type::Bool);
         httpdebug::procfs::registerEndpoint(endpoint + "/neural_cpu", [neural]() { return std::to_string(neural->cpuMeter.percent.load()); }, nullptr, httpdebug::procfs::Type::String);
+        for (auto [suffix, flag] : std::initializer_list<std::pair<const char*, unsigned>>{
+                {"/detail", dsp::NeuralClarity::Detail}, {"/syllables", dsp::NeuralClarity::Smooth}, {"/voice_lift", dsp::NeuralClarity::Lift}}) {
+            httpdebug::procfs::registerEndpoint(endpoint + suffix, [neural, flag]() { return neural->clarityOptions.load() & flag ? "true" : "false"; },
+                [this, instanceName, flag](const std::string& v) { setClarity(instanceName, flag, v == "true" || v == "1"); }, httpdebug::procfs::Type::Bool);
+        }
         httpdebug::procfs::registerEndpoint(endpoint + "/neural_status", [neural]() {
             return !neural->voiceMode ? "Mode bypass" : neural->status < 0 ? "Unavailable; bypassed" : neural->status == 1 ? "Ready" : "Idle";
         }, nullptr, httpdebug::procfs::Type::String);
@@ -234,7 +242,7 @@ private:
 
     void detachAFFromRadio(const std::string& instanceName) {
         const std::string endpoint = "/modules/noise_reduction_logmmse/" + name + "/audio/" + instanceName;
-        for (const auto* suffix : {"/nr2", "/nr2_cpu", "/scaling", "/neural", "/neural_cpu", "/neural_status"}) httpdebug::procfs::unregister(endpoint + suffix);
+        for (const auto* suffix : {"/nr2", "/nr2_cpu", "/scaling", "/neural", "/neural_cpu", "/neural_status", "/detail", "/syllables", "/voice_lift"}) httpdebug::procfs::unregister(endpoint + suffix);
 #ifdef BEIGE_NEURAL_AUDIO
         auto neural = neuralProcessors.find(instanceName);
         if (neural != neuralProcessors.end()) {
@@ -367,6 +375,15 @@ private:
     }
 
 #ifdef BEIGE_NEURAL_AUDIO
+    void setClarity(const std::string& radio, unsigned flag, bool value) {
+        auto neural = neuralProcessors.at(radio);
+        const unsigned options = value ? neural->clarityOptions.load() | flag : neural->clarityOptions.load() & ~flag;
+        neural->clarityOptions = options;
+        config.acquire();
+        config.conf["NeuralClarity_" + radio] = options;
+        config.release(true);
+    }
+
     void setNeural(const std::string& radio, bool value) {
         auto neural = neuralProcessors.at(radio);
         if (value) afnrProcessors2.at(radio)->allowed = false;
@@ -473,6 +490,17 @@ private:
                 else if (neural->cpuMeter.percent.load() >= 0) ImGui::TextDisabled("%.1f%% cpu | %s", neural->cpuMeter.percent.load(),
                     neural->appleFFT ? "CPU SIMD + Apple FFT" : "CPU SIMD + FFTW");
                 else ImGui::TextDisabled("Starting voice reduction...");
+                ImGui::Indent();
+                for (auto [label, flag, tip] : std::initializer_list<std::tuple<const char*, unsigned, const char*>>{
+                        {"Speech detail", dsp::NeuralClarity::Detail, "Test: blend a little aligned original audio around detected speech.\nMay preserve weak consonants, with some noise during speech."},
+                        {"Syllable smoothing", dsp::NeuralClarity::Smooth, "Test: soften brief drops in the neural spectrum around speech.\nMay reduce choppiness, with short noise tails."},
+                        {"Voice lift (+1 dB)", dsp::NeuralClarity::Lift, "Test: a small level boost around detected speech.\nDoes not reconstruct speech removed by the model."}}) {
+                    bool checked = neural->clarityOptions.load() & flag;
+                    if (ImGui::Checkbox((std::string(label) + "##neural_" + k).c_str(), &checked)) setClarity(k, flag, checked);
+                    if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", tip);
+                }
+                ImGui::TextDisabled("All off = current base neural NR");
+                ImGui::Unindent();
             }
 #endif
         }

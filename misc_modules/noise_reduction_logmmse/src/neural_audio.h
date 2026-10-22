@@ -11,6 +11,7 @@ public:
     NeuralVoiceEngine(const std::string& model, int rate, bool apple);
     ~NeuralVoiceEngine();
     void reset();
+    void setClarityOptions(unsigned options);
     void process(const stereo_t* input, int count, stereo_t* output);
     bool usesApple() const;
 private:
@@ -23,6 +24,7 @@ public:
     std::atomic<bool> allowed{false}, voiceMode{true};
     std::atomic<int> sampleRate{48000}, status{0}; // 0 idle, 1 ready, -1 failed
     std::atomic<bool> appleFFT{false};
+    std::atomic<unsigned> clarityOptions{0};
     AudioCpuMeter cpuMeter;
     std::string modelPath;
 

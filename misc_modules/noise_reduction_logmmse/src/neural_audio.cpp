@@ -2,6 +2,7 @@
 #include "neural_audio.h"
 #include "audio_resampler.h"
 #include "neural_voice_level.h"
+#include "neural_clarity.h"
 #include <onnxruntime_cxx_api.h>
 #include <utils/complex_fft.h>
 #include <array>
@@ -53,6 +54,9 @@ struct NeuralVoiceEngine::State {
         ramp = 0;
         modelLevel = 0;
         voiceLevel.reset();
+        clarity.reset();
+        detailMix = 0;
+        liftGain = 1;
         outputGain = 1;
         // Keep enough queued samples to cover a 16 ms inference hop.
         const int padding = (rate + 49) / 50 + 8;
@@ -86,6 +90,7 @@ struct NeuralVoiceEngine::State {
         session.Run(Ort::RunOptions{nullptr}, names, inputs.data(), 4, resultNames, outputs.data(), 4);
         for (int i = 1; i < 4; ++i) std::copy(output[i].begin(), output[i].end(), input[i].begin());
         for (int i = 0; i < 257; ++i) enhanced[i] = {output[0][2*i] / modelGain, output[0][2*i+1] / modelGain};
+        clarity.frame(bins.data(), enhanced.data(), clarityOptions);
         voiceLevel.update(bins.data(), enhanced.data());
         std::copy(enhanced.begin(), enhanced.end(), bins.begin());
         for (int i = 1; i < 256; ++i) bins[512-i] = {bins[i].re, -bins[i].im};
@@ -113,7 +118,19 @@ struct NeuralVoiceEngine::State {
             ramp = (std::min)(1.f, ramp + 1.f / (.1f * rate));
             outputGain += gainSmoothing * (voiceLevel.gain() - outputGain);
             // Aligned dry/wet paths; ease into the independent voice reducer.
-            const float mixed = value.l + ramp * (value.r * outputGain - value.l);
+            float mixed;
+            if (clarityOptions || detailMix > 1e-6f || liftGain != 1.f) {
+                float wet = value.r * outputGain;
+                const float detail = clarityOptions & NeuralClarity::Detail ? .15f * clarity.speech() : 0;
+                detailMix += gainSmoothing * (detail - detailMix);
+                if (!detail && detailMix < 1e-6f) detailMix = 0;
+                const float lift = clarityOptions & NeuralClarity::Lift ? 1.f + .12201845f * clarity.speech() : 1.f;
+                liftGain += gainSmoothing * (lift - liftGain);
+                if (lift == 1.f && std::abs(liftGain - 1.f) < 1e-5f) liftGain = 1;
+                wet = (wet + detailMix * (value.l - wet)) * liftGain;
+                mixed = value.l + ramp * (wet - value.l);
+            }
+            else mixed = value.l + ramp * (value.r * outputGain - value.l);
             destination[i] = {mixed, mixed};
         }
     }
@@ -135,12 +152,16 @@ struct NeuralVoiceEngine::State {
     float ramp = 0;
     float modelLevel = 0, outputGain = 1, gainSmoothing = 0;
     NeuralVoiceLevel voiceLevel;
+    NeuralClarity clarity;
+    unsigned clarityOptions = 0;
+    float detailMix = 0, liftGain = 1;
 };
 
 NeuralVoiceEngine::NeuralVoiceEngine(const std::string& model, int rate, bool apple)
     : state_(std::make_unique<State>(model, rate, apple)) {}
 NeuralVoiceEngine::~NeuralVoiceEngine() = default;
 void NeuralVoiceEngine::reset() { state_->reset(); }
+void NeuralVoiceEngine::setClarityOptions(unsigned options) { state_->clarityOptions = options & NeuralClarity::All; }
 void NeuralVoiceEngine::process(const stereo_t* input, int count, stereo_t* output) { state_->process(input, count, output); }
 bool NeuralVoiceEngine::usesApple() const { return state_->forward.usesApple(); }
 
@@ -163,6 +184,7 @@ int NeuralVoiceNR::process(const stereo_t* input, int count, stereo_t* output) {
         if (!active_) engine_->reset();
         active_ = true;
         const auto start = AudioCpuMeter::now();
+        engine_->setClarityOptions(clarityOptions.load());
         engine_->process(input, count, output);
         cpuMeter.add(start, count, configuredRate_);
         status.store(1);

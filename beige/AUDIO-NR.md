@@ -98,6 +98,38 @@ Installed 1.3.24 also reaches Ready with active neural processing during normal-
 
 Operator checkpoint, October 22: Oz confirmed restored volume, though slightly more voice level would help. He prefers the neural background-noise suppression to NR2, but hears missing letters/voice fragments and sometimes clearer audio with NR2. This partially accepts level recovery and suppression, not speech preservation. Source baseline is `6dc2bafd`; preserve 1.3.24 as a fallback before trying clarity changes. Test quieter consonants and syllable onsets at matched speech level, and measure any background-noise tradeoff explicitly.
 
+## Optional clarity tests (1.3.25)
+
+Before experiments, the listening checkpoint was committed in Beige `a37675ac` and electro `8d52bbe`. Oz explicitly requested separate switches and preservation of the current base settings/values as the default. Version 1.3.25 retains the 1.3.24 model, RMS envelope target, FFT/resampler geometry, automatic level estimator and gain bounds. Missing `NeuralClarity_<radio>` preferences default to zero. Each explicit selection is saved per radio.
+
+Three independent switches appear below the enabled Neural Voice NR checkbox:
+
+- **Speech detail:** blends up to 15% of the delay-aligned original audio around model-recognized speech. It may recover weak fragments, with some original noise during speech.
+- **Syllable smoothing:** briefly retains earlier spectral gains around speech. Its original-signal contribution is bounded to 35% and fades with the speech envelope. It may reduce choppiness, with short noise tails.
+- **Voice lift (+1 dB):** adds a small, smoothly applied boost around recognized speech. It does not reconstruct speech erased by the model.
+
+All off preserves the accepted base. Changes fade without restarting inference or resetting its recurrent state. The experimental speech heuristic uses model output energy relative to input in 125-4000 Hz, with a short hold/release; it is not an independent VAD. It can miss weak onsets or mistake interference for speech. The options are listening tests, not guaranteed quality upgrades. Pauses return toward full neural suppression.
+
+The numerical comparison uses the saved 1.3.24 native lab executable and identical inputs. Repeating that unchanged executable itself varies around 1e-6 relative RMS, so byte identity is not a valid native guarantee. All-off parity is checked against a 1e-5 relative RMS bound and 2e-5 relative peak bound; no baseline setting is changed to achieve it. Earlier byte-exact attempts and incomplete builds were discarded. The new helper test covers the exact all-off operation, bounded smoothing, speech hold/release and all eight combinations; normal/ASAN engine tests cover packet sizes, FFT parity and live option changes.
+
+Use `neural_clarity_evaluate.py` for matched-level speech/noise metrics and `neural_clarity_smoke.py` for independent runtime toggles. The quiet-frame correlation score is a controlled reference proxy, not recognized letters or measured QSO accuracy. Private fixtures and logs: `/tmp/beige-neural-clarity-20261022/`.
+
+All 64 comparisons pass all-off parity; maximum relative RMS difference from the saved base is 1.64e-6. The same four excerpts/eight conditions/two levels yield these mean eSTOI values (eight clean and 56 noisy cases):
+
+| Switches | Clean | Noisy |
+|---|---:|---:|
+| All off / 1.3.24 base | 0.9117 | 0.3994 |
+| Speech detail | 0.9427 | 0.3802 |
+| Syllable smoothing | 0.9335 | 0.3779 |
+| Both detail options | 0.9534 | 0.3752 |
+| Voice lift only | 0.9117 | 0.3993 |
+
+The detail options preserve more clean speech but worsen the average noisy-speech score; individual noisy cases improve. They remain optional experiments, not recommended replacements for the accepted base. Voice lift adds about 0.94 dB to the average wanted speech here. Mean offline CPU remains approximately 3.12-3.15% of one core across choices. Full measurements: `experimental/results/2026-10-22-audio/neural-clarity-options.json`.
+
+The final package passes fifteen CTests, public ABI/signature, Python/Ruff and whitespace checks. Isolated live RF tests pass all eight switch combinations, return to baseline, finite audio and sixteen modulation transitions/restart. Native clicks verify each checkbox and the saved mask survives reopening. A subsequent RF reopen encounters RTL-SDR register USB timeouts; that additional RF restart is not counted as passing. File-source tests verify the restored mask, baseline return and all combinations independently of hardware. Listening approval of the new switches remains pending.
+
+Installed 1.3.25 reaches Ready in the normal profile and reports all three new switches false. Its bundled model is byte-identical to 1.3.24. Installation preserves 106 JSON files, fourteen detected private Mach-O files and 23 resources. The normal-profile device endpoint subsequently reports zero RTL-SDR devices; no new normal-profile RF reception is claimed. Reconnection/Refresh and listening are manual follow-up checks. All Beige instances were closed after verification.
+
 ## Reproduction and sources
 
 ```bash

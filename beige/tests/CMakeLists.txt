@@ -28,6 +28,13 @@ target_compile_features(beige_neural_voice_level_test PRIVATE cxx_std_17)
 target_compile_options(beige_neural_voice_level_test PRIVATE $<$<CXX_COMPILER_ID:AppleClang,Clang,GNU>:-UNDEBUG>)
 add_test(NAME beige_neural_voice_level COMMAND beige_neural_voice_level_test)
 
+add_executable(beige_neural_clarity_test neural_clarity_test.cpp)
+target_include_directories(beige_neural_clarity_test PRIVATE "${SDRPP_CORE_ROOT}"
+    "${CMAKE_SOURCE_DIR}/misc_modules/noise_reduction_logmmse/src")
+target_compile_features(beige_neural_clarity_test PRIVATE cxx_std_17)
+target_compile_options(beige_neural_clarity_test PRIVATE $<$<CXX_COMPILER_ID:AppleClang,Clang,GNU>:-UNDEBUG>)
+add_test(NAME beige_neural_clarity COMMAND beige_neural_clarity_test)
+
 add_executable(beige_baseband_nr_test baseband_nr_test.cpp)
 target_include_directories(beige_baseband_nr_test PRIVATE "${SDRPP_CORE_ROOT}"
     "${CMAKE_SOURCE_DIR}/misc_modules/noise_reduction_logmmse/src")

@@ -41,7 +41,7 @@ template<typename T> static T symbol(void* library, const char* name) {
 
 int main(int argc, char** argv) {
     if (argc < 5) {
-        std::cerr << "audio_nr_lab ENGINE INPUT.f32 OUTPUT.f32 RESOURCES [CHUNK=1984] [REPEAT=1] [LIBRARY] [MODEL]\n";
+        std::cerr << "audio_nr_lab ENGINE INPUT.f32 OUTPUT.f32 RESOURCES [CHUNK=1984] [REPEAT=1] [LIBRARY] [MODEL] [CLARITY=0]\n";
         return 2;
     }
     std::string resources = argv[4];
@@ -74,6 +74,7 @@ int main(int argc, char** argv) {
     if (method == "gtcrn") {
         if (argc < 9) return 2;
         gtcrn = std::make_unique<dsp::NeuralVoiceEngine>(argv[8], 48000, true);
+        if (argc > 9) gtcrn->setClarityOptions(std::stoul(argv[9]));
     }
 #endif
     void* library = nullptr;

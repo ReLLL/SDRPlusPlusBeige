@@ -14,8 +14,9 @@ void __log__(Type, const char* message, const std::vector<std::string>&) { std::
 }
 
 static std::vector<dsp::stereo_t> run(const std::string& model,
-    const std::vector<dsp::stereo_t>& input, int rate, int chunk, bool apple) {
+    const std::vector<dsp::stereo_t>& input, int rate, int chunk, bool apple, unsigned options = 0) {
     dsp::NeuralVoiceEngine engine(model, rate, apple);
+    engine.setClarityOptions(options);
     std::vector<dsp::stereo_t> output(input.size() + 16, {9, 11});
     for (int offset = 0; offset < int(input.size()); offset += chunk) {
         const int count = (std::min)(chunk, int(input.size()) - offset);
@@ -39,6 +40,21 @@ static void compare(const std::vector<dsp::stereo_t>& a, const std::vector<dsp::
 int main(int argc, char** argv) {
     assert(argc == 2);
     const std::string model = argv[1];
+    {
+        std::vector<dsp::stereo_t> input(24000, {.15f, .15f});
+        for (unsigned options = 0; options < 8; ++options) {
+            auto a = run(model, input, 48000, 1984, true, options);
+            compare(a, run(model, input, 48000, 317, true, options), 1e-7);
+            if (options == 3) compare(a, run(model, input, 48000, 1024, false, options), 1e-4);
+        }
+        dsp::NeuralVoiceEngine engine(model, 48000, true);
+        std::vector<dsp::stereo_t> output(input.size());
+        for (unsigned options : {1, 2, 4, 7, 0}) {
+            engine.setClarityOptions(options);
+            engine.process(input.data(), input.size(), output.data());
+            for (auto v : output) assert(std::isfinite(v.l) && v.l == v.r);
+        }
+    }
     {
         std::vector<dsp::stereo_t> input(48000);
         uint32_t seed = 71;
