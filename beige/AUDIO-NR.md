@@ -2,6 +2,23 @@
 
 Read when: changing Audio NR2, neural voice NR, audio CPU/scaling labels, model packaging or audio-rate conversion.
 
+## Audio chain recovery (1.3.30)
+
+Oz reported that Audio NR2 Radio made no audible difference. A four-module File receiver reproduced a checked but disconnected reducer: USB initially processed with a positive NR2 CPU reading; RAW followed by USB left CPU idle and Scaling frozen. Toggling the checkbox did not restore processing. Radio disables every AF block in RAW, but its return path only restores built-in blocks. This reproduces the symptom without establishing Oz's exact preceding mode sequence.
+
+The NR module now reconciles actual AF-chain membership with the current radio mode from its existing UI-frame callback and checkbox setters. RAW retains the reducer preference and bypasses audio effects; returning to an audio mode restores processing. Neural NR has the same recovery. Unchanged membership is an idempotent operation. NR2 suppression equations, Scaling/CPU labels, neural model, acceleration and accepted default values are unchanged.
+
+An initial QA build exposed a concurrent chain mutation: HTTP module commands ran on a connection thread while UI callbacks restored AF blocks. The supplied 1.3.30 crash report is this uninstalled QA process, aborting in stream-mutex locking during Radio mode teardown. Generic module commands now use the existing UI request queue, alongside procfs setters and UI callbacks. No public plugin object layout changed.
+
+`audio_nr_recovery_smoke.py` asserts actual worker activity, preserved selections in RAW and continuing finite audio. It fails on 1.3.29 at the first RAW-to-USB return. Checkbox state and finite dry audio alone did not detect the disconnection in earlier tests. Run against an isolated File/Radio/NR/NullAudioSink profile:
+
+```sh
+python3 beige/tests/audio_nr_recovery_smoke.py --url http://127.0.0.1:18873 \
+  --fixture /path/to/baseband.wav --cycles 4 --stress 100
+```
+
+The fixed receiver passes 56 recovery checks across NR2's audio modes and neural voice modes, then 100 concurrent mode/reducer request pairs with continuing valid audio. These checks verify processing and chain stability, not listening quality.
+
 ## Controls in 1.3.22
 
 Audio NR2 keeps its existing OM-LSA/MCRA suppression method and checkbox. Its changing number is now labeled `Scaling: Nx`: the inverse of the float-to-int16 amplitude scale, relative to 32767. It is not a CPU counter. A separate `% cpu` line measures DSP-thread CPU time per second of input audio, averaged over at least half a second. An idle reducer has no current CPU reading. The Baseband NR meter remains its existing processing-wall-time estimate; the two counters have different definitions.

@@ -1,5 +1,15 @@
 # Beige validation
 
+## Audio NR recovery and QA crash (October 22, 1.3.30)
+
+The 1.3.29 regression reproduces a checked but disconnected NR2 after RAW-to-USB, with idle worker CPU and frozen Scaling despite dry audio continuing. Re-enabling its checkbox does not recover it. The fixed package restores actual AF-chain membership for NR2 and neural NR when returning to audio modes. Suppression algorithms and accepted neural values are unchanged; listening confirmation of Oz's reported symptom remains pending.
+
+An initial uninstalled 1.3.30 QA build crashed during concurrent HTTP mode changes and UI chain restoration. The supplied report identifies this process and an invalid stream-mutex lock during Radio teardown. Module commands now share the UI queue with procfs setters. LLDB confirms `RadioModule::handleDebugCommand` runs on `com.apple.main-thread` through `httpdebug::procfs::processQueue` and the render loop. Its replay passes 14 recovery checks plus 20 concurrent request pairs and exits with status zero. The earlier LLDB replay did not reproduce the crash and is not counted as proof of the original failure.
+
+The fixed receiver passes 56 RAW-to-audio recovery checks and 100 concurrent mode/reducer request pairs, with positive worker CPU and continuing finite audio. All twenty CTests, public plugin ABI, Python/Ruff, whitespace, build and complete bundle-signature checks pass. The final installed package repeats all 14 recovery checks successfully. These tests exercise real module handlers and DSP workers; they do not measure listening quality.
+
+Installed 1.3.30/build30 preserves all 137 checked profile/plugin/resource files byte-for-byte. The normal RTL-SDR profile receives through its saved Audio sink, passes two RAW-to-LSB recoveries for each audio reducer, and reaches Neural Ready. NR2 CPU reads 0.37-0.39% of one core; neural reads 4.75-4.77%. A single display snapshot reports 77.5 FPS, not a performance comparison. Original mode, NR choices and every checked file remain unchanged after runtime testing. All Beige processes exit cleanly. Private logs, debugger output, baseline hashes and backup path: `/tmp/beige-nr2-20261022/`.
+
 ## RTL-SDR manual controls (October 22, 1.3.28)
 
 Twenty CTests, public plugin ABI comparison, complete build and packaged signature verification pass. The added native/ASAN gain tests cover all 4,096 combinations each; the preference test covers compatibility, malformed values and atomic updates. Live V4 testing confirms independent stage effects, bandwidth response, Auto restoration, saved-mode recovery, finite audio, ten normal and ten interrupted-reader restarts. A later four-case 130-second comparison remains receiving throughout. One earlier stream stopped cleanly with result -1; no cause or universal USB-stability claim is established.

@@ -302,6 +302,7 @@ namespace httpdebug {
             std::string method;
             std::string body;
             int responseId;
+            bool moduleCommand = false;
         };
 
         inline std::vector<PendingRequest> pendingRequests;
@@ -338,6 +339,11 @@ namespace httpdebug {
             pendingRequests.push_back({ path, method, body, responseId });
         }
 
+        void queueModuleCommand(const std::string& instance, const std::string& command, const std::string& args, int responseId) {
+            std::lock_guard<std::mutex> lock(pendingMutex);
+            pendingRequests.push_back({ instance, command, args, responseId, true });
+        }
+
         bool getResponse(int responseId, ProcResponse& res) {
             std::lock_guard<std::mutex> lock(responseMutex);
             auto it = responses.find(responseId);
@@ -360,20 +366,33 @@ namespace httpdebug {
             for (const auto& req : toProcess) {
                 ProcResponse res{ 404, "not found", "text/plain" };
 
-                std::lock_guard<std::mutex> lock(endpointsMutex);
-                for (const auto& e : endpoints) {
-                    if (e.path == req.path) {
-                        if (req.method == "GET" && e.read) {
-                            res = { 200, e.read(), "text/plain" };
+                if (req.moduleCommand) {
+                    // Radio mode changes and DSP chain edits must share the UI
+                    // thread with module menus and waterfall callbacks.
+                    auto it = core::moduleManager.instances.find(req.path);
+                    if (it != core::moduleManager.instances.end()) {
+                        res = { 200, it->second.instance->handleDebugCommand(req.method, req.body), "application/json" };
+                    }
+                    else {
+                        res = { 404, json{{"error", "module instance not found"}}.dump(), "application/json" };
+                    }
+                }
+                else {
+                    std::lock_guard<std::mutex> lock(endpointsMutex);
+                    for (const auto& e : endpoints) {
+                        if (e.path == req.path) {
+                            if (req.method == "GET" && e.read) {
+                                res = { 200, e.read(), "text/plain" };
+                            }
+                            else if ((req.method == "POST" || req.method == "PUT") && e.write) {
+                                e.write(req.body);
+                                res = { 200, "ok", "text/plain" };
+                            }
+                            else {
+                                res = { 400, "operation not supported", "text/plain" };
+                            }
+                            break;
                         }
-                        else if ((req.method == "POST" || req.method == "PUT") && e.write) {
-                            e.write(req.body);
-                            res = { 200, "ok", "text/plain" };
-                        }
-                        else {
-                            res = { 400, "operation not supported", "text/plain" };
-                        }
-                        break;
                     }
                 }
 
@@ -660,14 +679,6 @@ struct Response* createResponseForRequest(const struct Request* request, struct 
             }
             instanceName = decoded;
 
-            auto& instances = core::moduleManager.instances;
-            auto it = instances.find(instanceName);
-            if (it == instances.end()) {
-                return responseAllocJSONWithFormat(
-                    "{\"error\": \"instance '%s' not found\"}",
-                    instanceName.c_str());
-            }
-
             std::string cmd = "command";
             std::string args = "";
 
@@ -693,8 +704,16 @@ struct Response* createResponseForRequest(const struct Request* request, struct 
                 free(argsParam);
             }
 
-            std::string result = it->second.instance->handleDebugCommand(cmd, args);
-            return responseAllocJSON(result.c_str());
+            const int responseId = rand();
+            httpdebug::procfs::queueModuleCommand(instanceName, cmd, args, responseId);
+            for (int i = 0; i < 500; ++i) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                httpdebug::procfs::ProcResponse res;
+                if (httpdebug::procfs::getResponse(responseId, res)) {
+                    return responseAllocJSON(res.body.c_str());
+                }
+            }
+            return responseAllocJSON("{\"error\":\"module command timed out waiting for UI thread\"}");
         }
     }
 

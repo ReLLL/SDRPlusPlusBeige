@@ -153,12 +153,23 @@ private:
             if (!sigpath::vfoManager.vfoExists(radio)) continue;
             int mode = -1;
             core::modComManager.callInterface(radio, RADIO_IFACE_CMD_GET_MODE, nullptr, &mode);
+            const bool audioChainAllowed = mode >= 0 && mode != RADIO_IFACE_MODE_RAW;
+            // RAW disables every AF block in Radio. Reconcile actual chain
+            // membership, not just checkbox flags, when audio modes return.
+            auto classic = afnrProcessors2.find(radio);
+            if (classic != afnrProcessors2.end()) {
+                core::modComManager.callInterface(radio, audioChainAllowed ? RADIO_IFACE_CMD_ENABLE_IN_AFCHAIN
+                    : RADIO_IFACE_CMD_DISABLE_IN_AFCHAIN, classic->second.get(), nullptr);
+            }
 #ifdef BEIGE_NEURAL_AUDIO
             auto neural = neuralProcessors.find(radio);
             if (neural != neuralProcessors.end()) {
                 neural->second->voiceMode = mode == RADIO_IFACE_MODE_USB || mode == RADIO_IFACE_MODE_LSB
                     || mode == RADIO_IFACE_MODE_AM || mode == RADIO_IFACE_MODE_DSB || mode == RADIO_IFACE_MODE_NFM;
                 neural->second->sampleRate = int(sigpath::sinkManager.getStreamSampleRate(radio));
+                core::modComManager.callInterface(radio, audioChainAllowed && neural->second->allowed
+                    ? RADIO_IFACE_CMD_ENABLE_IN_AFCHAIN : RADIO_IFACE_CMD_DISABLE_IN_AFCHAIN,
+                    neural->second.get(), nullptr);
             }
 #endif
             modes.push_back(mode);
@@ -183,7 +194,6 @@ private:
         afnrProcessors2[instanceName] = afnromlsa;
         core::modComManager.callInterface(instanceName, RADIO_IFACE_CMD_ADD_TO_IFCHAIN, afnrlogmmse.get(), NULL);
         core::modComManager.callInterface(instanceName, RADIO_IFACE_CMD_ADD_TO_AFCHAIN, afnromlsa.get(), NULL);
-        core::modComManager.callInterface(instanceName, RADIO_IFACE_CMD_ENABLE_IN_AFCHAIN, afnromlsa.get(), NULL);
         config.acquire();
 
         bool afnr = false;
@@ -215,8 +225,6 @@ private:
         if (afnr2) neural->allowed = false;
         neuralProcessors[instanceName] = neural;
         core::modComManager.callInterface(instanceName, RADIO_IFACE_CMD_ADD_TO_AFCHAIN, neural.get(), nullptr);
-        core::modComManager.callInterface(instanceName, neural->allowed ? RADIO_IFACE_CMD_ENABLE_IN_AFCHAIN
-            : RADIO_IFACE_CMD_DISABLE_IN_AFCHAIN, neural.get(), nullptr);
 #endif
         const std::string endpoint = "/modules/noise_reduction_logmmse/" + name + "/audio/" + instanceName;
         httpdebug::procfs::registerEndpoint(endpoint + "/nr2", [afnromlsa]() { return afnromlsa->allowed ? "true" : "false"; },
@@ -237,6 +245,7 @@ private:
         }, nullptr, httpdebug::procfs::Type::String);
 #endif
 
+        refreshBasebandMode();
         actuateAFNR();
     }
 
@@ -351,9 +360,7 @@ private:
         for (auto [k, v] : afnrProcessors) {
             core::modComManager.callInterface(k, !v->allowed ? RADIO_IFACE_CMD_DISABLE_IN_IFCHAIN : RADIO_IFACE_CMD_ENABLE_IN_IFCHAIN, v.get(), NULL);
         }
-        //        for(auto [k, v] : afnrProcessors2) {
-        //            core::modComManager.callInterface(k, !v->allowed ? RADIO_IFACE_CMD_DISABLE_IN_AFCHAIN : RADIO_IFACE_CMD_ENABLE_IN_AFCHAIN, v.get(), NULL);
-        //        }
+        // AF membership is reconciled with the radio mode in refreshBasebandMode.
     }
 
     void actuateIFNR() {
@@ -372,6 +379,7 @@ private:
         config.acquire();
         config.conf["AF_NR2_" + radio] = value;
         config.release(true);
+        refreshBasebandMode();
     }
 
 #ifdef BEIGE_NEURAL_AUDIO
@@ -389,12 +397,11 @@ private:
         if (value) afnrProcessors2.at(radio)->allowed = false;
         if (value && neural->status < 0) neural->status = 0;
         neural->allowed = value;
-        core::modComManager.callInterface(radio, value ? RADIO_IFACE_CMD_ENABLE_IN_AFCHAIN : RADIO_IFACE_CMD_DISABLE_IN_AFCHAIN,
-            neural.get(), nullptr);
         config.acquire();
         config.conf["NeuralVoiceNR_" + radio] = value;
         if (value) config.conf["AF_NR2_" + radio] = false;
         config.release(true);
+        refreshBasebandMode();
     }
 #endif
 
@@ -474,6 +481,7 @@ private:
         for (auto [k, v] : afnrProcessors2) {
             bool audioNR2 = v->allowed.load();
             if (ImGui::Checkbox(("Audio NR2 " + k + "##_radio_omlsa_nr_" + k).c_str(), &audioNR2)) setAudioNR2(k, audioNR2);
+            if (ImGui::IsItemHovered()) ImGui::SetTooltip("Audio noise reduction. RAW bypasses audio effects;\nprocessing resumes automatically when an audio mode returns.");
             ImGui::SameLine();
             ImGui::Text("Scaling: %0.01fx", v->displayedScaling.load());
             if (v->allowed && v->cpuMeter.percent.load() >= 0) {

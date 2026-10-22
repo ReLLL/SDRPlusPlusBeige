@@ -165,6 +165,8 @@ Or `GET /module/<instance_name>/command?cmd=...&args=...` for simple cases.
 
 This channel is generic. A module must implement `handleDebugCommand` to support it.
 
+Beige 1.3.30 queues generic module commands on the UI thread, with a five-second response wait. Do not call module handlers directly from HTTP connection threads: mode changes can stop and reconnect DSP streams while UI callbacks touch the same chain. A timeout is an error response, not proof that the queued command was cancelled. For reducer tests, assert the actual worker CPU meter becomes active after each mode transition; a checked box and finite dry audio can both persist with the reducer disconnected. See `beige/tests/audio_nr_recovery_smoke.py`.
+
 ### Common Commands by Module
 
 `Radio` instance:
