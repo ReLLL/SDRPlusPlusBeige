@@ -2,7 +2,7 @@
 
 ## Audio NR recovery and QA crash (October 22, 1.3.30)
 
-The 1.3.29 regression reproduces a checked but disconnected NR2 after RAW-to-USB, with idle worker CPU and frozen Scaling despite dry audio continuing. Re-enabling its checkbox does not recover it. The fixed package restores actual AF-chain membership for NR2 and neural NR when returning to audio modes. Suppression algorithms and accepted neural values are unchanged; listening confirmation of Oz's reported symptom remains pending.
+The 1.3.29 regression reproduces a checked but disconnected NR2 after RAW-to-USB, with idle worker CPU and frozen Scaling despite dry audio continuing. Re-enabling its checkbox does not recover it. The fixed package restores actual AF-chain membership for NR2 and neural NR when returning to audio modes. Suppression algorithms and accepted neural values are unchanged. Oz subsequently confirmed on installed 1.3.30: "NR2 reduces noise again." This confirms recovery of the audible effect, not long-run crash stability.
 
 An initial uninstalled 1.3.30 QA build crashed during concurrent HTTP mode changes and UI chain restoration. The supplied report identifies this process and an invalid stream-mutex lock during Radio teardown. Module commands now share the UI queue with procfs setters. LLDB confirms `RadioModule::handleDebugCommand` runs on `com.apple.main-thread` through `httpdebug::procfs::processQueue` and the render loop. Its replay passes 14 recovery checks plus 20 concurrent request pairs and exits with status zero. The earlier LLDB replay did not reproduce the crash and is not counted as proof of the original failure.
 

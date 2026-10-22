@@ -19,6 +19,8 @@ python3 beige/tests/audio_nr_recovery_smoke.py --url http://127.0.0.1:18873 \
 
 The fixed receiver passes 56 recovery checks across NR2's audio modes and neural voice modes, then 100 concurrent mode/reducer request pairs with continuing valid audio. These checks verify processing and chain stability, not listening quality.
 
+Oz's subsequent listening check on installed 1.3.30 confirms: "NR2 reduces noise again." This accepts recovery of the reported audible effect; it does not establish long-run crash stability or a change in suppression quality.
+
 ## Controls in 1.3.22
 
 Audio NR2 keeps its existing OM-LSA/MCRA suppression method and checkbox. Its changing number is now labeled `Scaling: Nx`: the inverse of the float-to-int16 amplitude scale, relative to 32767. It is not a CPU counter. A separate `% cpu` line measures DSP-thread CPU time per second of input audio, averaged over at least half a second. An idle reducer has no current CPU reading. The Baseband NR meter remains its existing processing-wall-time estimate; the two counters have different definitions.
