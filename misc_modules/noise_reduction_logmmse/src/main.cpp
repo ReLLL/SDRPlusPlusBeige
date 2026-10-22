@@ -43,9 +43,13 @@ public:
         if (config.conf.contains("IFNR")) ifnr = config.conf["IFNR"];
         if (config.conf.contains("DisableCpuDeactivation")) disableCpuDeactivation = config.conf["DisableCpuDeactivation"];
         if (config.conf.contains("SNRChartWidget")) snrChartWidget = config.conf["SNRChartWidget"];
+        if (config.conf.contains("BasebandReductionDB")) reductionDb = std::clamp(float(config.conf["BasebandReductionDB"]), 0.0f, 24.0f);
+        if (config.conf.contains("BasebandAcceleration")) acceleration = config.conf["BasebandAcceleration"];
         config.release(true);
 
         ifnrProcessor.setDisableCpuDeactivation(disableCpuDeactivation);
+        ifnrProcessor.setReduction(reductionDb);
+        ifnrProcessor.setAcceleration(acceleration);
 
         gui::menu.registerEntry(name, menuHandler, this, NULL);
         updateBindings();
@@ -54,7 +58,16 @@ public:
         std::string path = "/modules/noise_reduction_logmmse/" + name;
         httpdebug::procfs::registerEndpoint(path + "/baseband_nr", [&]() { return ifnr ? "true" : "false"; }, [&](const std::string& v) { ifnr = (v == "true" || v == "1"); actuateIFNR(); }, httpdebug::procfs::Type::Bool);
         httpdebug::procfs::registerEndpoint(path + "/snr_chart", [&]() { return snrChartWidget ? "true" : "false"; }, [&](const std::string& v) { snrChartWidget = (v == "true" || v == "1"); }, httpdebug::procfs::Type::Bool);
-        httpdebug::procfs::registerEndpoint(path + "/cpu_usage", [&]() { return std::to_string(ifnrProcessor.percentUsage); }, nullptr, httpdebug::procfs::Type::Int);
+        httpdebug::procfs::registerEndpoint(path + "/cpu_usage", [&]() { return std::to_string(ifnrProcessor.percentUsage.load()); }, nullptr, httpdebug::procfs::Type::Int);
+        httpdebug::procfs::registerEndpoint(path + "/reduction_db", [&]() { return std::to_string(reductionDb); }, [&](const std::string& v) {
+            reductionDb = std::clamp(std::stof(v), 0.0f, 24.0f);
+            ifnrProcessor.setReduction(reductionDb);
+        }, httpdebug::procfs::Type::Float);
+        httpdebug::procfs::registerEndpoint(path + "/acceleration", [&]() { return acceleration ? "true" : "false"; }, [&](const std::string& v) {
+            acceleration = (v == "true" || v == "1");
+            ifnrProcessor.setAcceleration(acceleration);
+        }, httpdebug::procfs::Type::Bool);
+        httpdebug::procfs::registerEndpoint(path + "/backend", [&]() { return ifnrProcessor.usesApple() ? "Apple Accelerate" : "FFTW"; }, nullptr, httpdebug::procfs::Type::String);
     }
 
     ~NRModule() {
@@ -62,6 +75,10 @@ public:
         httpdebug::procfs::unregister(path + "/baseband_nr");
         httpdebug::procfs::unregister(path + "/snr_chart");
         httpdebug::procfs::unregister(path + "/cpu_usage");
+        httpdebug::procfs::unregister(path + "/reduction_db");
+        httpdebug::procfs::unregister(path + "/acceleration");
+        httpdebug::procfs::unregister(path + "/backend");
+        if (enabled) { enabled = false; updateBindings(); }
         gui::menu.removeEntry(name);
     }
 
@@ -92,6 +109,8 @@ public:
 private:
     bool ifnr = false;
     bool disableCpuDeactivation = false;
+    float reductionDb = 12.0f;
+    bool acceleration = true;
 
     bool afnrEnabled = false;
     bool snrChartWidget = false;
@@ -129,12 +148,12 @@ private:
 
     void detachAFFromRadio(const std::string& instanceName) {
         if (afnrProcessors.find(instanceName) != afnrProcessors.end()) {
-            core::modComManager.callInterface(name, RADIO_IFACE_CMD_REMOVE_FROM_IFCHAIN,
+            core::modComManager.callInterface(instanceName, RADIO_IFACE_CMD_REMOVE_FROM_IFCHAIN,
                                               afnrProcessors[instanceName].get(), NULL);
             afnrProcessors.erase(instanceName);
         }
         if (afnrProcessors2.find(instanceName) != afnrProcessors2.end()) {
-            core::modComManager.callInterface(name, RADIO_IFACE_CMD_REMOVE_FROM_AFCHAIN,
+            core::modComManager.callInterface(instanceName, RADIO_IFACE_CMD_REMOVE_FROM_AFCHAIN,
                                               afnrProcessors2[instanceName].get(), NULL);
             afnrProcessors2.erase(instanceName);
         }
@@ -190,6 +209,12 @@ private:
         }
         else {
             sigpath::iqFrontEnd.removePreprocessor(&ifnrProcessor);
+            sigpath::sourceManager.onTuneChanged.unbindHandler(&currentFrequencyChangedHandler);
+            core::moduleManager.onInstanceCreated.unbindHandler(&instanceCreatedHandler);
+            auto names = core::modComManager.findInterfaces("radio");
+            for (const auto& radio : names) detachAFFromRadio(radio);
+            afnrProcessors.clear();
+            afnrProcessors2.clear();
             ImGui::onSNRMeterExtPoint.unbindHandler(&snrMeterExtPointHandler);
             gui::mainWindow.onWaterfallDrawn.unbindHandler(&waterfallDrawnHandler);
         }
@@ -239,22 +264,19 @@ private:
             config.acquire();
             config.conf["IFNR"] = ifnr;
             config.release(true);
-            if (ifnr) { // toggled on - attempt to run.
-                ifnrProcessor.stopReason = "";
-            }
             actuateIFNR();
         }
         ImGui::SameLine();
-        if (ifnrProcessor.stopReason != "" && ifnr) { // wants to stop -> stop it.
+        if (ifnrProcessor.stoppedForCpu() && ifnr) {
             ifnr = false;
             config.acquire();
             config.conf["IFNR"] = ifnr;
             config.release(true);
             actuateIFNR();
         }
-        if (ifnrProcessor.stopReason != "") { // stopped because reason -> show it.
+        if (ifnrProcessor.stoppedForCpu()) {
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0, 0, 1.0f));
-            ImGui::Text("%s", ifnrProcessor.stopReason.c_str());
+            ImGui::TextUnformatted("Slow CPU. Reduce sample rate.");
             ImGui::PopStyleColor(1);
         }
         else {
@@ -263,7 +285,7 @@ private:
                 if (ifnrProcessor.percentUsage > 80) {
                     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0, 0, 1.0f));
                 }
-                std::string cpuText = std::to_string((int)ifnrProcessor.percentUsage) + "% cpu";
+                std::string cpuText = std::to_string(ifnrProcessor.percentUsage.load()) + "% cpu";
                 ImVec2 textSize = ImGui::CalcTextSize(cpuText.c_str());
                 bool clicked = ImGui::Selectable(cpuText.c_str(), false, ImGuiSelectableFlags_None, textSize);
                 if (clicked) {
@@ -283,6 +305,32 @@ private:
                     ImGui::PopStyleColor(1);
                 }
             }
+        }
+
+        ImGui::SetNextItemWidth(menuWidth);
+        if (ImGui::SliderFloat("##baseband_reduction", &reductionDb, 0.0f, 24.0f, "Reduction: %.0f dB")) {
+            ifnrProcessor.setReduction(reductionDb);
+            config.acquire();
+            config.conf["BasebandReductionDB"] = reductionDb;
+            config.release(true);
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Maximum noise attenuation. Start at 12 dB; lower it for weak signals or digital decoding.\n0 dB keeps the signal level unchanged, with the NR processing delay.");
+        }
+#ifdef __APPLE__
+        if (ImGui::Checkbox("Automatic acceleration##baseband", &acceleration)) {
+            ifnrProcessor.setAcceleration(acceleration);
+            config.acquire();
+            config.conf["BasebandAcceleration"] = acceleration;
+            config.release(true);
+        }
+        if (ImGui::IsItemHovered()) {
+            ImGui::SetTooltip("Use Apple Accelerate for FFT and vector math when available.\nAutomatically falls back to FFTW. Disable to use FFTW directly.");
+        }
+#endif
+        if (ifnr && ifnrProcessor.latencySamples() > 0) {
+            ImGui::TextDisabled("%s | %.1f ms", ifnrProcessor.usesApple() ? "Apple Accelerate" : "FFTW",
+                1000.0 * ifnrProcessor.latencySamples() / sigpath::iqFrontEnd.getSampleRate());
         }
 
         for (auto [k, v] : afnrProcessors2) {

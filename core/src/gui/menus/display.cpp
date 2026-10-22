@@ -175,7 +175,11 @@ namespace displaymenu {
                 break;
             }
         }
-        auto accel = core::configManager.conf.contains("fftAccel") && core::configManager.conf["fftAccel"];
+        bool accel = false;
+#ifdef __APPLE__
+        accel = true;
+#endif
+        if (core::configManager.conf.contains("fftAccel")) accel = core::configManager.conf["fftAccel"];
         if (accel) {
             fftSizeId += std::size(FFTSizes);
         }

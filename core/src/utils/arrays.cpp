@@ -1,5 +1,6 @@
 
 #include <utils/arrays.h>
+#include <utils/complex_fft.h>
 #include <fftw3.h>
 
 #ifdef __APPLE__
@@ -506,123 +507,24 @@ namespace dsp {
             return centeredSma(squaredDistances, winsize);
         }
 
-        struct fftwPlanImplFFTW : public FFTPlan {
-            int nbuckets;
-            bool reverse;
-            fftwf_plan_s* p;
-            ComplexArray input;
-            ComplexArray output;
+        struct BufferedFFTPlan : public FFTPlan {
+            ComplexArray input, output;
+            dsp::fft::ComplexFFT transform;
 
-            fftwPlanImplFFTW(bool backward, int buckets) : FFTPlan() {
-                auto plan = this;
-                plan->nbuckets = buckets;
-                plan->reverse = backward;
-                plan->input = npzeros_c(buckets);
-                plan->output = npzeros_c(buckets);
-                auto p = fftwf_plan_dft_1d(buckets, (fftwf_complex*)plan->input->data(), (fftwf_complex*)plan->output->data(), backward ? FFTW_BACKWARD : FFTW_FORWARD, FFTW_ESTIMATE);
-                plan->p = p;
-            }
+            BufferedFFTPlan(bool backward, int buckets, bool preferApple)
+                : input(npzeros_c(buckets)), output(npzeros_c(buckets)),
+                  transform(buckets, backward, preferApple) {}
 
-            ComplexArray getInput() override {
-                return input;
-            }
-            ComplexArray getOutput() override {
+            ComplexArray getInput() override { return input; }
+            ComplexArray getOutput() override { return output; }
+            ComplexArray npfftfft(const ComplexArray& in) override {
+                const size_t count = (std::min)(in->size(), output->size());
+                std::copy_n(in->data(), count, output->data());
+                std::fill(output->begin() + count, output->end(), dsp::complex_t{0, 0});
+                transform.execute(output->data());
                 return output;
             }
-
-            ComplexArray npfftfft(const ComplexArray& in) override {
-                auto in0 = resize(in, nbuckets);
-                std::copy(in0->begin(), in0->end(), input->begin());
-//                auto out0 = npzeros_c(nbuckets);
-                fftwf_execute(p);
-//                std::copy(output->begin(), output->end(), out0->begin());
-//                this->output->resize(nbuckets);
-                if (reverse) {
-                    div_(this->output, nbuckets);
-                } else {
-                    //return out0;
-                }
-                return this->output;
-            }
-
-            virtual ~fftwPlanImplFFTW() {
-                fftwf_destroy_plan(p);
-            }
         };
-
-#ifdef __APPLE__
-        struct vDSPPlanImpl : public FFTPlan {
-            int nbuckets;
-            bool reverse;
-            DSPSplitComplex tempSplitComplex;
-            std::shared_ptr<std::vector<dsp::complex_t>> input;
-            std::shared_ptr<std::vector<dsp::complex_t>> output;
-            FFTSetup fftSetup;
-
-            vDSPPlanImpl(bool backward, int buckets) : FFTPlan() {
-                nbuckets = buckets;
-                reverse = backward;
-                input = npzeros_c(buckets);
-                output = npzeros_c(buckets);
-
-                // Prepare the FFT Setup object
-                fftSetup = vDSP_create_fftsetup((int)log2(nbuckets), FFT_RADIX2);
-
-                // Initialize the DSPSplitComplex structure
-                tempSplitComplex.realp = (float *)malloc(nbuckets * sizeof(float));
-                tempSplitComplex.imagp = (float *)malloc(nbuckets * sizeof(float));
-            }
-
-            ComplexArray getInput() override {
-                return input;
-            }
-
-            ComplexArray getOutput() override {
-                return output;
-            }
-
-            ComplexArray npfftfft(const ComplexArray& in) override {
-                // Resize and copy input data to tempSplitComplex
-                auto in0 = resize(in, nbuckets);
-                auto in0P = in0->data();
-                for (int i = 0; i < nbuckets; ++i) {
-                    tempSplitComplex.realp[i] = in0P[i].re;
-                    tempSplitComplex.imagp[i] = in0P[i].im;
-                }
-
-                // Perform FFT
-                if (reverse) {
-                    vDSP_fft_zip(fftSetup, &tempSplitComplex, 1, log2(nbuckets), kFFTDirection_Inverse);
-                } else {
-                    vDSP_fft_zip(fftSetup, &tempSplitComplex, 1, log2(nbuckets), kFFTDirection_Forward);
-                }
-
-                // Copy the results to output
-//                auto out0 = npzeros_c(nbuckets);
-//                auto out0P = out0->data();
-                auto outputP = output->data();
-                for (int i = 0; i < nbuckets; ++i) {
-                    outputP[i] =
-//                        out0P[i] =
-                            dsp::complex_t{tempSplitComplex.realp[i], tempSplitComplex.imagp[i]};
-                }
-
-                if (reverse) {
-                    div_(output, nbuckets);
-                } else {
-                    //return out0;
-                }
-                return this->output;
-            }
-
-            virtual ~vDSPPlanImpl() {
-                // Cleanup
-                vDSP_destroy_fftsetup(fftSetup);
-                free(tempSplitComplex.realp);
-                free(tempSplitComplex.imagp);
-            }
-        };
-#endif
 
         std::string dumpArr(const FloatArray &x) {
             return dumpArr(x->data(), x->size());
@@ -1196,17 +1098,7 @@ namespace dsp {
 
 
         Arg<FFTPlan> allocateFFTWPlan(bool backward, int buckets) {
-            FFTPlan *plan;
-#ifdef __APPLE__
-            if (enableAcceleratedFFT) {
-                plan = new vDSPPlanImpl(backward, buckets);
-            } else {
-                plan = new fftwPlanImplFFTW(backward, buckets);
-            }
-#else
-            plan = new fftwPlanImplFFTW(backward, buckets);
-#endif
-            return std::shared_ptr<FFTPlan>(plan);
+            return std::make_shared<BufferedFFTPlan>(backward, buckets, enableAcceleratedFFT);
         }
 
         void npfftfft(const ComplexArray& in, const Arg<FFTPlan>& plan) {
