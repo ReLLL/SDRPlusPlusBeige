@@ -42,6 +42,8 @@ The Codec2 compatibility header is generated inside the build folder from the de
 
 On October 20, Oz requested removal of CW Notebook and Advanced FT8/FT4 from the installed Beige profile. Their load paths and module instances were removed. Plugin payloads and the original configuration are retained in the profile's `plugin-removal-backups/`; CW logs and DX history remain in their existing data folders. Brown is unchanged. Do not reimport these plugins into the active profile without a new request.
 
+Later on October 20, Oz requested installing the latest versions in both hosts. Kondor v1.0.53 and Maverick v1.0.50 were installed in Brown and Beige. Beige's earlier plugin preferences were recovered, new payloads were relocated to Beige's libraries, and both windows opened successfully. Settings, bookmarks and saved receptions were preserved. Update individual plugin payloads rather than reimporting the full profile.
+
 Default Beige profile: `~/Library/Application Support/sdrpp-beige`. The importer preserves module instances and enabled/disabled states, selected band plan, source settings and exact frequency-manager bytes. It remaps Brown paths to Beige. Recordings and backup directories are not imported.
 
 Custom plugin binaries are copied from the installed version and relocated to Beige's core and dependency paths. Private helper runtimes stay beside their plugins. Copied binaries are signed and checked; original Brown binaries are untouched. Plugin payload manifests are updated after relocation.

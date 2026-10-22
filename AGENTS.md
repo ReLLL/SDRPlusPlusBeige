@@ -3,8 +3,8 @@
 This document provides guidance for AI agents working with the SDR++ Brown Fork codebase.
 
 ## Additional Docs
-- [AGENTS-windows.md](./AGENTS-windows.md) — Windows build via windows-mcp (winget/vcpkg toolchain, VS2022 build, runtime assembly, procdump/cdb crash diagnosis, E2E tests)
-- [AGENTS-debugging.md](./AGENTS-debugging.md) — HTTP debug server, module/procfs commands, GUI automation, lldb crash/hang debugging, bugfix workflow
+- [AGENTS-windows.md](./AGENTS-windows.md)  -  Windows build via windows-mcp (winget/vcpkg toolchain, VS2022 build, runtime assembly, procdump/cdb crash diagnosis, E2E tests)
+- [AGENTS-debugging.md](./AGENTS-debugging.md)  -  HTTP debug server, module/procfs commands, GUI automation, lldb crash/hang debugging, bugfix workflow
 
 ## Building Locally (Linux - Debian/Ubuntu based)
 
@@ -237,4 +237,4 @@ IMPORTANT!!! Never change layout and formatting of C/C++ code unrelated to the t
 - Build/package with `bash beige/build-macos.sh`; never edit or re-sign the installed Brown application. Beige's bundle and private profile are separate.
 - Preserve imported module enabled states, frequency records and selected band plan. Isolate notebook databases, CSV paths and logs. Keep all private profiles and migration receipts out of Git.
 - HAM shortcuts must center the band without toggling persistent tuning mode. Keep all 16 labels, chart-based ranges and compact responsive placement; run the isolated free/center tuning smoke checks after navigation changes.
-- CW Notebook and Advanced FT8/FT4 were removed from the active Beige profile at Oz's request on October 20. Preserve their data and removal backups; do not silently reinstall them during upgrades.
+- Local Kondor v1.0.55 is installed in Beige for its next launch; it starts hidden while enabled processing continues. Keep the recovered preferences and isolated Beige data. Preserve removal/update backups and update plugin payloads without replacing the full profile.
