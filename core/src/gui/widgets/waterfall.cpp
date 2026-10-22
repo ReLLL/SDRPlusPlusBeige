@@ -3,6 +3,7 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #endif
 #include <gui/widgets/waterfall.h>
+#include <gui/widgets/spectrum_signal.h>
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <imutils.h>
@@ -691,76 +692,9 @@ namespace ImGui {
     }
 
     bool WaterFall::calculateVFOSignalInfo(float* fftLine, WaterfallVFO* _vfo, float& strength, float& snr) {
-        if (fftLine == NULL || fftLines <= 0) { return false; }
-
-        // Calculate FFT index data
-        double vfoMinSizeFreq = _vfo->centerOffset - _vfo->bandwidth;
-        double vfoMinFreq = _vfo->centerOffset - (_vfo->bandwidth / 2.0);
-        double vfoMaxFreq = _vfo->centerOffset + (_vfo->bandwidth / 2.0);
-        double vfoMaxSizeFreq = _vfo->centerOffset + _vfo->bandwidth;
-        
-        int vfoMinSideOffset = rawFFTIndex(vfoMinSizeFreq);
-        int vfoMinOffset = rawFFTIndex(vfoMinFreq);
-        int vfoMaxOffset = rawFFTIndex(vfoMaxFreq);
-        int vfoMaxSideOffset = rawFFTIndex(vfoMaxSizeFreq);
-
-        // PRODUCTION DEFENSIVE LAYER: Ensure raw indices are sane before parsing array fields
-        // We use rawFFTIndex with the maximum possible span to find our absolute buffer limit anchor safely
-        int maxBufferCeiling = rawFFTIndex(_vfo->centerOffset + (_vfo->bandwidth * 4.0)); // fallback sizing
-        if (vfoMinSideOffset < 0 || vfoMinOffset < 0 || vfoMaxOffset < 0 || vfoMaxSideOffset < 0) {
-            return false;
-        }
-
-        double avg = 0, qavg = 0;
-        float max = -INFINITY;
-        int avgCount = 0;
-
-        static std::vector<float> fftValues;
-        fftValues.clear();
-
-        // Calculate Left average with safe boundary guards
-        for (int i = vfoMinSideOffset; i < vfoMinOffset; i++) {
-            fftValues.emplace_back(fftLine[i]);
-            avg += fftLine[i];
-            avgCount++;
-        }
-
-        // Calculate Right average with safe boundary guards
-        for (int i = vfoMaxOffset + 1; i < vfoMaxSideOffset; i++) {
-            fftValues.emplace_back(fftLine[i]);
-            avg += fftLine[i];
-            avgCount++;
-        }
-
-        if (fftValues.empty() || avgCount <= 0) {
-            return false;
-        }
-        
-        std::sort(fftValues.begin(), fftValues.end()); // sorting bins by volume
-        
-        auto lowerPercentile = fftValues.size() / 4;
-        if (lowerPercentile <= 0) { return false; }
-        
-        auto kth = fftValues[lowerPercentile];
-        for (int i = 0; i < fftValues.size(); i++) { // taking 25% most silent bins
-            if (fftValues[i] <= kth) {
-                qavg += fftValues[i];
-            }
-        }
-        qavg /= (double)lowerPercentile; // "true" noise floor
-        avg /= (double)avgCount; // "base noise floor"
-
-        auto avgdiff = avg - qavg;
-
-        // Calculate max with strict real-time buffer safety bounds
-        for (int i = vfoMinOffset; i <= vfoMaxOffset; i++) {
-            if (fftLine[i] > max) { max = fftLine[i]; }
-        }
-
-        strength = max - avgdiff;
-        snr = max - avg - avgdiff;
-
-        return true;
+        if (!_vfo || fftLines <= 0) { return false; }
+        return beige::spectrumSignalInfo(fftLine, rawFFTSize, wholeBandwidth,
+            _vfo->centerOffset, _vfo->bandwidth, strength, snr);
     }
 
     int WaterFall::rawFFTIndex(double frequency) const {

@@ -8,6 +8,7 @@
 #include <dsp/sink/ring_buffer.h>
 #include <utils/flog.h>
 #include <core.h>
+#include <audio/rewind.h>
 
 #define CONCAT(a, b) ((std::string(a) + b).c_str())
 
@@ -212,6 +213,10 @@ private:
         AudioSink* _this = (AudioSink*)userData;
         if (!gui::mainWindow.isPlaying()) {
             memset(output, 0, frameCount * sizeof(float));
+            if (beige::rewind::playbackActive(_this->_stream)) {
+                const int count = std::min<int>(frameCount, _this->monoRB.data.getReadable());
+                if (count > 0) _this->monoRB.data.read((float*)output, count);
+            }
             return 0;
         }
         _this->monoRB.data.read((float*)output, frameCount);
@@ -223,6 +228,10 @@ private:
         AudioSink* _this = (AudioSink*)userData;
         if (!gui::mainWindow.isPlaying()) {
             memset(output, 0, frameCount * sizeof(dsp::stereo_t));
+            if (beige::rewind::playbackActive(_this->_stream)) {
+                const int count = std::min<int>(frameCount, _this->stereoRB.data.getReadable());
+                if (count > 0) _this->stereoRB.data.read((dsp::stereo_t*)output, count);
+            }
             return 0;
         }
         _this->stereoRB.data.read((dsp::stereo_t*)output, frameCount);

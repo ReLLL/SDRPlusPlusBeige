@@ -6,6 +6,7 @@
 
 #include <core.h>
 #include "signal_path.h"
+#include <audio/rewind.h>
 
 #define CONCAT(a, b) ((std::string(a) + b).c_str())
 
@@ -40,7 +41,7 @@ void SinkManager::Stream::init(EventHandler<float>* srChangeHandler, float sampl
     merger.bindStream(0, _in);
     splitter.init(merger.getOutput());
     splitter.bindStream(&volumeInput);
-    volumeAjust.init(&volumeInput, 1.0f, false);
+    volumeAjust.init(beige::rewind::connect(this, &volumeInput, sampleRate), 1.0f, false);
     sinkOut = &volumeAjust.out;
 }
 
@@ -51,6 +52,7 @@ void SinkManager::Stream::start() {
 
     merger.start();
     splitter.start();
+    beige::rewind::start(this);
     volumeAjust.start();
     sink->start();
     running = true;
@@ -62,6 +64,7 @@ void SinkManager::Stream::stop() {
     }
     splitter.stop();
     merger.stop();
+    beige::rewind::stop(this);
     volumeAjust.stop();
     sink->stop();
     running = false;
@@ -102,6 +105,7 @@ void SinkManager::Stream::unbindStream(dsp::stream<dsp::stereo_t>* stream) {
 void SinkManager::Stream::setSampleRate(float sampleRate) {
     std::lock_guard<std::mutex> lck(ctrlMtx);
     _sampleRate = sampleRate;
+    beige::rewind::setRate(this, int(sampleRate));
     srChange.emit(sampleRate);
 }
 
@@ -195,6 +199,7 @@ void SinkManager::unregisterStream(std::string name) {
     onStreamUnregister.emit(name);
     SinkManager::Stream* stream = streams[name];
     stream->stop();
+    beige::rewind::remove(stream);
     delete stream->sink;
     streams.erase(name);
     streamNames.erase(std::remove(streamNames.begin(), streamNames.end(), name), streamNames.end());

@@ -8,6 +8,7 @@
 #include <utils/flog.h>
 #include <config.h>
 #include <core.h>
+#include <audio/rewind.h>
 #include <AudioToolbox/AudioToolbox.h>
 
 // --- NATIVE MAC SYSTEM THREAD HEADERS ---
@@ -106,8 +107,8 @@ public:
     }
 
     void start() {
-        if (running || !gui::mainWindow.isPlaying()) { return; }
-        running = doStart();
+        if (running || (!gui::mainWindow.isPlaying() && !beige::rewind::playbackActive(_stream))) { return; }
+        running = doStart(gui::mainWindow.isPlaying());
     }
 
     void stop() {
@@ -275,7 +276,7 @@ public:
     }
 
 private:
-    bool doStart() {
+    bool doStart(bool inputAllowed = true) {
         if (devId < 0 || devId >= devices.size()) { return false; }
         
         // Create output audio unit for the selected device
@@ -375,7 +376,7 @@ private:
         }
 
         // Set up microphone input if enabled
-        if (useMic && micDevId >= 0 && micDevId < devices.size() && devices[micDevId].isInput) {
+        if (inputAllowed && useMic && micDevId >= 0 && micDevId < devices.size() && devices[micDevId].isInput) {
             AudioComponentDescription desc = {
                 .componentType = kAudioUnitType_Output,
                 .componentSubType = kAudioUnitSubType_HALOutput,
@@ -545,11 +546,10 @@ private:
 
     static void playStateChangeHandler(bool newState, void* ctx) {
         CoreAudioSink* _this = (CoreAudioSink*)ctx;
-        if (newState) {
+        // RF-stopped replay keeps output available without keeping microphone input open.
+        _this->stop();
+        if (newState || beige::rewind::playbackActive(_this->_stream)) {
             _this->start();
-        }
-        else {
-            _this->stop();
         }
     }
 
@@ -642,7 +642,7 @@ private:
             right = (float*)ioData->mBuffers[1].mData;
         }
 
-        if (!gui::mainWindow.isPlaying()) {
+        if (!gui::mainWindow.isPlaying() && !beige::rewind::playbackActive(_this->_stream)) {
             memset(left, 0, inNumberFrames * sizeof(float));
             memset(right, 0, inNumberFrames * sizeof(float));
             return noErr;

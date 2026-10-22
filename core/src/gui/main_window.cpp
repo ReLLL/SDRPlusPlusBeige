@@ -33,6 +33,7 @@
 #include <gui/colormaps.h>
 #include <gui/widgets/snr_meter.h>
 #include <gui/widgets/ham_band_toolbar.h>
+#include <audio/rewind.h>
 #include <gui/tuner.h>
 #include <dsp/buffer/buffer.h>
 #include <utils/wstr.h>
@@ -777,7 +778,7 @@ void MainWindow::draw() {
     this->displayVariousWindows();
 
 
-    ImVec2 wfSize = ImVec2(0, 0);
+    ImVec2 wfSize = ImVec2(0, -beige::rewind::barHeight());
     if (!bottomWindows.empty()) {
         wfSize.y -= bottomWindows[0].size.y;
     }
@@ -789,6 +790,8 @@ void MainWindow::draw() {
     ImGui::EndChild();
 
     this->handleWaterfallInput(vfo);
+
+    beige::rewind::draw(gui::waterfall.selectedVFO, playing);
 
     ImGui::NextColumn();
     ImGui::BeginChild("WaterfallControls");
@@ -930,6 +933,7 @@ void MainWindow::setPlayState(bool _playing) {
         sigpath::iqFrontEnd.flushInputBuffer();
     }
     httpdebug::setSdrPlaying(playing);
+    beige::rewind::setReceiving(playing);
 }
 
 bool MainWindow::sdrIsRunning() {

@@ -10,6 +10,7 @@
 #include <config.h>
 #include <algorithm>
 #include <core.h>
+#include <audio/rewind.h>
 
 #define CONCAT(a, b) ((std::string(a) + b).c_str())
 
@@ -486,6 +487,10 @@ private:
         // For OSX, mute audio when not playing
         if (!gui::mainWindow.isPlaying()) {
             memset(output, 0, frameCount * sizeof(float));
+            if (beige::rewind::playbackActive(_this->_stream) && _this->s2m.out.isDataReady()) {
+                const int count = _this->s2m.out.read();
+                if (count > 0) memcpy(output, _this->s2m.out.readBuf, std::min<unsigned long>(count, frameCount) * sizeof(float));
+            }
             _this->s2m.out.flush();
             return 0;
         }
@@ -504,6 +509,10 @@ private:
         // For OSX, mute audio when not playing
         if (!gui::mainWindow.isPlaying()) {
             memset(output, 0, frameCount * sizeof(dsp::stereo_t));
+            if (beige::rewind::playbackActive(_this->_stream) && _this->packer.out.isDataReady()) {
+                const int count = _this->packer.out.read();
+                if (count > 0) memcpy(output, _this->packer.out.readBuf, std::min<unsigned long>(count, frameCount) * sizeof(dsp::stereo_t));
+            }
             _this->packer.out.flush();
             return 0;
         }

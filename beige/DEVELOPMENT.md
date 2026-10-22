@@ -38,6 +38,8 @@ The package is a local development artifact, ad-hoc signed under `com.tepesoft.s
 
 RTL-SDR desktop Auto/Manual gain and nominal hardware bandwidth controls use an additive private R82xx driver API. Auto keeps the existing behavior; V4 RF routing and filters remain automatic. See [RTL-CONTROLS.md](RTL-CONTROLS.md) before changing the source or its driver patch.
 
+Desktop audio rewind uses core-owned sidecar state without changing public SinkManager/Stream layouts. Read [AUDIO-REWIND.md](AUDIO-REWIND.md) before changing its transport, WAV export or sink lifecycle.
+
 The Codec2 compatibility header is generated inside the build folder from the detected library version when the Homebrew bottle omits it. No global dependency headers are modified.
 
 ## Private profile import

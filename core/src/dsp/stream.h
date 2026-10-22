@@ -5,6 +5,7 @@
 #include <functional>
 #include <utils/flog.h>
 #include <condition_variable>
+#include <chrono>
 //#include <volk/volk.h>
 #include <utils/usleep.h>
 
@@ -134,6 +135,16 @@ namespace dsp {
                 std::lock_guard<std::mutex> lck(rdyMtx);
                 return dataReady;
             }
+        }
+
+        // Optional bounded wait for processors which also play retained audio.
+        // No new fields or virtual methods: preserve the public plugin layout.
+        int readFor(std::chrono::milliseconds timeout) {
+            std::unique_lock<std::mutex> lck(rdyMtx);
+            ++nReaders;
+            const bool ready = rdyCV.wait_for(lck, timeout, [this] { return dataReady || readerStop; });
+            --nReaders;
+            return readerStop ? -1 : ready ? dataSize : 0;
         }
 
         virtual inline void flush() {

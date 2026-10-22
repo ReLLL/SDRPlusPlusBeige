@@ -18,6 +18,7 @@
 #include <cstdlib>
 #include <gui/menus/display.h>
 #include <http_debug_server.h>
+#include <audio/rewind.h>
 #include <thread>
 #include <mutex>
 #include <unordered_map>
@@ -921,6 +922,7 @@ int sdrpp_main(int argc, char* argv[]) {
     backend::renderLoop();
 
     gui::mainWindow.end();
+    beige::rewind::shutdown();
 
     // On android, none of this shutdown should happen due to the way the UI works
 #ifndef __ANDROID__
