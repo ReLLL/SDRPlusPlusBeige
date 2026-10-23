@@ -317,8 +317,11 @@ namespace ImGui {
         }
         ImVec2 mPos = ImGui::GetMousePos();
 
-        if (IS_IN_AREA(mPos, wfMin, wfMax) && !gui::mainWindow.lockWaterfallControls && !inputHandled && ImGui::GetTopMostPopupModal() == NULL || alwaysDrawLine) {
+        const bool showLiveIndicators = (IS_IN_AREA(mPos, wfMin, wfMax) && !gui::mainWindow.lockWaterfallControls &&
+            !inputHandled && ImGui::GetTopMostPopupModal() == NULL) || alwaysDrawLine;
+        {
             for (auto const& [name, vfo] : vfos) {
+                if (!showLiveIndicators && !beige::iqreplay::shownFrequency(this, name)) continue;
                 window->DrawList->AddRectFilled(vfo->wfRectMin, vfo->wfRectMax, vfo->color);
                 if (!vfo->lineVisible) { continue; }
                 window->DrawList->AddLine(vfo->wfLineMin, vfo->wfLineMax, (name == selectedVFO) ? IM_COL32(255, 0, 0, 255) : IM_COL32(255, 255, 0, 255), style::uiScale);
@@ -1110,14 +1113,15 @@ namespace ImGui {
             const ImVec2 replayMin(int(wfMin.x), int(wfMin.y));
             bool liveBorder = false;
             for (const auto& [name, vfo] : vfos) {
-                if (!vfo->bandwidthLocked && (ImGui::IsMouseHoveringRect(vfo->wfLbwSelMin, vfo->wfLbwSelMax) ||
-                    ImGui::IsMouseHoveringRect(vfo->wfRbwSelMin, vfo->wfRbwSelMax))) liveBorder = true;
+                if (!vfo->bandwidthLocked &&
+                    ((vfo->reference != WaterfallVFO::REF_LOWER && ImGui::IsMouseHoveringRect(vfo->wfLbwSelMin, vfo->wfLbwSelMax)) ||
+                     (vfo->reference != WaterfallVFO::REF_UPPER && ImGui::IsMouseHoveringRect(vfo->wfRbwSelMin, vfo->wfRbwSelMax)))) liveBorder = true;
             }
-            inputHandled = !(fftResizeSelect || freqScaleSelect || vfoSelect || vfoBorderSelect || liveBorder) &&
-                beige::iqreplay::handleInput(this, replayMin,
+            inputHandled = beige::iqreplay::handleInput(this, replayMin,
                     ImVec2(replayMin.x + dataWidth, replayMin.y + (waterfallVisible ? waterfallHeight : 0)),
                     fftAreaMin, fftAreaMax, lowerFreq, upperFreq,
-                    selectedVFO.empty() ? 0 : vfos[selectedVFO]->snapInterval, selectedVFO);
+                    selectedVFO.empty() ? 0 : vfos[selectedVFO]->snapInterval, selectedVFO,
+                    !(fftResizeSelect || freqScaleSelect || vfoSelect || vfoBorderSelect || liveBorder));
             if (!inputHandled) onInputProcess.emit(args);
             if (!inputHandled) { processInputs(); }
         }
@@ -1129,7 +1133,6 @@ namespace ImGui {
             drawWaterfall();
         }
         drawVFOs();
-        beige::iqreplay::drawMarker(window->DrawList, fftAreaMin, fftAreaMax, lowerFreq, upperFreq);
         if (bandplan != NULL && bandplanVisible) {
             drawBandPlan();
         }
@@ -1460,8 +1463,10 @@ namespace ImGui {
 
     void WaterFall::updateAllVFOs(bool checkRedrawRequired) {
         for (auto const& [name, vfo] : vfos) {
-            if (checkRedrawRequired && !vfo->redrawRequired) { continue; }
-            vfo->updateDrawingVars(viewBandwidth, dataWidth, viewOffset, widgetPos, fftHeight);
+            const auto shown = beige::iqreplay::shownFrequency(this, name);
+            if (checkRedrawRequired && !vfo->redrawRequired && !shown) { continue; }
+            const double delta = shown ? *shown - (centerFreq + vfo->generalOffset) : 0;
+            vfo->updateDrawingVars(viewBandwidth, dataWidth, viewOffset - delta, widgetPos, fftHeight);
             vfo->wfRectMin = ImVec2(vfo->rectMin.x, wfMin.y);
             vfo->wfRectMax = ImVec2(vfo->rectMax.x, wfMax.y);
             vfo->wfLineMin = ImVec2(vfo->lineMin.x, wfMin.y - 1);
@@ -1470,7 +1475,7 @@ namespace ImGui {
             vfo->wfLbwSelMax = ImVec2(vfo->wfRectMin.x + 2, vfo->wfRectMax.y);
             vfo->wfRbwSelMin = ImVec2(vfo->wfRectMax.x - 2, vfo->wfRectMin.y);
             vfo->wfRbwSelMax = ImVec2(vfo->wfRectMax.x + 2, vfo->wfRectMax.y);
-            vfo->redrawRequired = false;
+            vfo->redrawRequired = shown.has_value();
         }
     }
 

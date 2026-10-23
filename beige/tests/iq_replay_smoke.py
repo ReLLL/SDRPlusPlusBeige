@@ -74,6 +74,13 @@ def main():
         return {'expected_hz': expected, 'measured_hz': hz, 'rms': rms,
                 'audio_frames': s['audio_rendered'], 'underruns': s['audio_underruns']}
 
+    def indicator(expected):
+        time.sleep(.05)
+        m = json.loads(req('/proc/iq-replay/map'))
+        x = m['min'][0] + (expected - m['low']) / (m['high'] - m['low']) * (m['max'][0] - m['min'][0])
+        assert abs(m['indicator_x'] - x) <= 2, (expected, x, m['indicator_x'])
+        return {'frequency': expected, 'pixel_error': abs(m['indicator_x'] - x), 'live_frequency': m['live_vfo_frequency']}
+
     def cpu():
         pieces = subprocess.check_output(['ps', '-p', str(args.pid), '-o', 'time='], text=True).strip().split(':')
         return sum(float(v) * 60**i for i, v in enumerate(reversed(pieces)))
@@ -146,6 +153,7 @@ def main():
     # listening decoder changes carriers. No repeated decoder construction.
     seek(2560000, 7120000)
     results['retuning'] = [tone(500)]
+    results['indicators'] = [indicator(7120000)]
     before = status()
     live_before = json.loads(req('/proc/display/ham-band-state'))
     for frequency, expected in [(7080000, 1800), (7120000, 500)]:
@@ -155,6 +163,7 @@ def main():
         assert after['selected_sample'] == before['selected_sample'] and after['epoch'] == before['epoch']
         assert before['cursor'] <= after['cursor'] < before['cursor'] + 800000 * 2
         results['retuning'].append(tone(expected))
+        results['indicators'].append(indicator(frequency))
         before = status()
     for frequency in ['nan', 'inf', '7500000', '6700000', '7499999']:
         req('/proc/iq-replay/frequency', frequency)
@@ -196,6 +205,7 @@ def main():
     time.sleep(.1)
     restored = json.loads(req('/proc/display/ham-band-state'))
     assert restored['frequency'] == restored['spectrum_center'] + restored['vfo_offset'], restored
+    results['indicators'].append(indicator(restored['frequency']))
     seek(800000, 7080000)
 
     # Rewind controls own their cursor; only the shared Live action exits IQ.

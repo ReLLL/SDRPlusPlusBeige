@@ -36,6 +36,8 @@
 #include <gui/widgets/ham_band_toolbar.h>
 #include <audio/rewind.h>
 #include <iq_replay/replay.h>
+#include <iq_replay/ui.h>
+#include <iq_replay/navigation.h>
 #include <gui/tuner.h>
 #include <dsp/buffer/buffer.h>
 #include <utils/wstr.h>
@@ -364,9 +366,9 @@ void MainWindow::preDraw(ImGui::WaterfallVFO** vfo) {
         core::configManager.release(true);
     }
     static bool replayFrequencyShown = false;
-    const auto replay = beige::iqreplay::state();
-    const bool showingReplay = replay.replaying && replay.receiver == gui::waterfall.selectedVFO;
-    if (showingReplay) gui::freqSelect.setFrequency(replay.frequency);
+    const auto shown = beige::iqreplay::shownFrequency(&gui::waterfall, gui::waterfall.selectedVFO);
+    const bool showingReplay = shown.has_value();
+    if (shown) gui::freqSelect.setFrequency(*shown);
     else if (replayFrequencyShown)
         gui::freqSelect.setFrequency(gui::waterfall.getCenterFrequency() + (*vfo ? (*vfo)->generalOffset : 0));
     if (showingReplay || replayFrequencyShown) gui::freqSelect.frequencyChanged = false;
@@ -1164,6 +1166,8 @@ void MainWindow::handleWaterfallInput(ImGui::WaterfallVFO* vfo) {
     if (!lockWaterfallControls && ImGui::GetTopMostPopupModal() == NULL) {
         const auto replay = beige::iqreplay::state();
         const bool selectedReplay = replay.replaying && replay.receiver == gui::waterfall.selectedVFO;
+        const double displayedFrequency = beige::iqreplay::shownFrequency(&gui::waterfall, gui::waterfall.selectedVFO)
+            .value_or(gui::waterfall.getCenterFrequency() + (vfo ? vfo->generalOffset : 0));
         const bool hovered = ImGui::IsMouseHoveringRect(gui::waterfall.fftAreaMin, gui::waterfall.fftAreaMax) ||
             ImGui::IsMouseHoveringRect(gui::waterfall.wfMin, gui::waterfall.wfMax);
         if (vfo && hovered && !ImGui::GetIO().WantTextInput && !ImGui::IsAnyItemActive() &&
@@ -1180,14 +1184,20 @@ void MainWindow::handleWaterfallInput(ImGui::WaterfallVFO* vfo) {
         }
         if (selectedReplay) {
             if (!vfo || !hovered) return;
+            int arrows = 0;
+            if (!gui::freqSelect.digitHovered) {
+                if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow)) --arrows;
+                if (ImGui::IsKeyPressed(ImGuiKey_RightArrow)) ++arrows;
+            }
+            if (arrows) {
+                beige::iqreplay::tune(beige::iqreplay::arrowFrequency(replay.frequency, vfo->snapInterval,
+                    arrows, ImGui::GetIO().KeyShift, ImGui::GetIO().KeyAlt));
+                return;
+            }
             double step = vfo->snapInterval;
             if (ImGui::IsKeyDown(ImGuiKey_LeftShift)) step *= 10;
             else if (ImGui::IsKeyDown(ImGuiKey_LeftAlt)) step *= .1;
             int steps = ImGui::GetIO().MouseWheel;
-            if (!gui::freqSelect.digitHovered) {
-                if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow)) --steps;
-                if (ImGui::IsKeyPressed(ImGuiKey_RightArrow)) ++steps;
-            }
             if (steps) beige::iqreplay::tune(std::round((replay.frequency + step * steps) / step) * step);
             return;
         }
@@ -1195,14 +1205,14 @@ void MainWindow::handleWaterfallInput(ImGui::WaterfallVFO* vfo) {
         if (vfo != NULL && (gui::waterfall.mouseInFFT || gui::waterfall.mouseInWaterfall)) {
             bool freqChanged = false;
             if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow) && !gui::freqSelect.digitHovered) {
-                double nfreq = gui::waterfall.getCenterFrequency() + vfo->generalOffset - vfo->snapInterval;
-                nfreq = roundl(nfreq / vfo->snapInterval) * vfo->snapInterval;
+                double nfreq = beige::iqreplay::arrowFrequency(displayedFrequency,
+                    vfo->snapInterval, -1, ImGui::GetIO().KeyShift, ImGui::GetIO().KeyAlt);
                 tuner::tune(tuningMode, gui::waterfall.selectedVFO, nfreq);
                 freqChanged = true;
             }
             if (ImGui::IsKeyPressed(ImGuiKey_RightArrow) && !gui::freqSelect.digitHovered) {
-                double nfreq = gui::waterfall.getCenterFrequency() + vfo->generalOffset + vfo->snapInterval;
-                nfreq = roundl(nfreq / vfo->snapInterval) * vfo->snapInterval;
+                double nfreq = beige::iqreplay::arrowFrequency(displayedFrequency,
+                    vfo->snapInterval, 1, ImGui::GetIO().KeyShift, ImGui::GetIO().KeyAlt);
                 tuner::tune(tuningMode, gui::waterfall.selectedVFO, nfreq);
                 freqChanged = true;
             }
@@ -1233,7 +1243,7 @@ void MainWindow::handleWaterfallInput(ImGui::WaterfallVFO* vfo) {
                     interval = vfo->snapInterval;
                 }
 
-                nfreq = gui::waterfall.getCenterFrequency() + vfo->generalOffset + (interval * wheel);
+                nfreq = displayedFrequency + (interval * wheel);
                 nfreq = roundl(nfreq / interval) * interval;
             }
             else {

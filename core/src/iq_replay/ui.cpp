@@ -1,7 +1,9 @@
 #include "ui.h"
 #include "rows.h"
+#include "navigation.h"
 #include <audio/rewind.h>
 #include <gui/style.h>
+#include <gui/gui.h>
 #include <algorithm>
 #include <map>
 #include <limits>
@@ -16,6 +18,7 @@ struct Map {
     double low = 0, high = 0;
     bool seekingGesture = false;
     bool tuningGesture = false;
+    PendingTune pending;
     ImVec2 lastClick{};
     int selectedRow = -1;
 };
@@ -25,6 +28,17 @@ std::map<void*, Map>& maps() { static std::map<void*, Map> value; return value; 
 bool inside(ImVec2 p, ImVec2 min, ImVec2 max) {
     return std::isfinite(p.x) && std::isfinite(p.y) && p.x >= min.x && p.x < max.x && p.y >= min.y && p.y < max.y;
 }
+TuneContext tuningContext(const std::string& receiver, const State& s) {
+    const auto vfo = gui::waterfall.vfos.find(receiver);
+    const double center = gui::waterfall.getCenterFrequency();
+    return {receiver, s.revision, center, center + (vfo == gui::waterfall.vfos.end() ? 0 : vfo->second->generalOffset)};
+}
+}
+std::optional<double> shownFrequency(void* owner, const std::string& receiver) {
+    const auto s = state();
+    if (s.replaying && s.receiver == receiver) return s.frequency;
+    const auto it = maps().find(owner);
+    return it == maps().end() ? std::nullopt : it->second.pending.preview(tuningContext(receiver, s));
 }
 void resizeRows(void* owner, int oldHead, int oldHeight, int height) {
     auto& map = maps()[owner]; map.rows.resize(oldHead, oldHeight, height); map.displayed.clear();
@@ -35,35 +49,53 @@ void pushRow(void* owner, int index, int height) {
     if (enabled()) maps()[owner].rows.put(index, height, frameStamp());
 }
 bool handleInput(void* owner, ImVec2 min, ImVec2 max, ImVec2 spectrumMin, ImVec2 spectrumMax,
-    double low, double high, double snap, const std::string& receiver) {
+    double low, double high, double snap, const std::string& receiver, bool allowGestures) {
     auto& map = maps()[owner];
     const auto p = ImGui::GetMousePos();
     if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) map.seekingGesture = map.tuningGesture = false;
     const bool hovered = inside(p, min, max) && ImGui::IsWindowHovered();
+    if (!allowGestures) { map.pending.cancel(); return false; }
     if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
         ImGui::OpenPopup("beige_waterfall_context"); return true;
     }
     const auto s = state();
     const bool replay = s.replaying && s.receiver == receiver;
+    const auto context = tuningContext(receiver, s);
+    if (!enabled() || s.replaying || ImGui::GetIO().WantTextInput ||
+        ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId) ||
+        (!hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) ||
+        min.x != map.min.x || min.y != map.min.y || max.x != map.max.x || max.y != map.max.y)
+        map.pending.cancel();
+    if (const auto frequency = map.pending.take(ImGui::GetTime(), ImGui::IsMouseDown(ImGuiMouseButton_Left), context)) {
+        gui::freqSelect.setFrequency(*frequency);
+        gui::freqSelect.frequencyChanged = true;
+    }
     if (!replay) map.tuningGesture = false;
     const bool spectrumHovered = replay && inside(p, spectrumMin, spectrumMax) && ImGui::IsWindowHovered();
     if (!enabled() || (!hovered && !spectrumHovered && !map.tuningGesture)) return false;
-    const auto tuneAtPointer = [&] {
-        if (spectrumMax.x <= spectrumMin.x || p.x < spectrumMin.x || p.x >= spectrumMax.x || !std::isfinite(p.x)) return;
+    const auto frequencyAtPointer = [&]() -> std::optional<double> {
+        if (spectrumMax.x <= spectrumMin.x || p.x < spectrumMin.x || p.x >= spectrumMax.x || !std::isfinite(p.x)) return std::nullopt;
         double frequency = low + (p.x - spectrumMin.x) / (spectrumMax.x - spectrumMin.x) * (high - low);
         if (snap > 0) frequency = std::round(frequency / snap) * snap;
-        if (frequency != s.frequency) tune(frequency);
+        return frequency;
+    };
+    const auto tuneAtPointer = [&] {
+        const auto frequency = frequencyAtPointer();
+        if (frequency && *frequency != s.frequency) tune(*frequency);
     };
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         // The splitter's existing hit target overlaps the first two rows.
         if (hovered && p.y <= min.y + 2 * style::uiScale) return false;
         map.seekingGesture = true;
-        // Before replay, reserve the first click so center tuning cannot erase
-        // the historical point. During replay, clicks and drags tune only IQ.
+        // Preview live clicks immediately, but wait out the double-click window
+        // before RF retuning. Replay frequency changes apply immediately.
         if (!hovered || !ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
             if (replay) { map.tuningGesture = true; tuneAtPointer(); }
+            else if (const auto frequency = frequencyAtPointer())
+                map.pending.start(*frequency, context, ImGui::GetTime(), ImGui::GetIO().MouseDoubleClickTime);
             return true;
         }
+        map.pending.cancel();
         // A resize invalidates the previous layout; never reinterpret its pixels.
         if (min.x != map.min.x || min.y != map.min.y || max.x != map.max.x || max.y != map.max.y ||
             map.max.x <= map.min.x || map.max.y <= map.min.y) {
@@ -76,15 +108,10 @@ bool handleInput(void* owner, ImVec2 min, ImVec2 max, ImVec2 spectrumMin, ImVec2
         return true;
     }
     if (replay && map.tuningGesture && ImGui::IsMouseDown(ImGuiMouseButton_Left)) { tuneAtPointer(); return true; }
-    if (map.seekingGesture && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) map.seekingGesture = false;
+    if (map.seekingGesture && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+        map.seekingGesture = false; map.pending.cancel();
+    }
     return map.seekingGesture && ImGui::IsMouseDown(ImGuiMouseButton_Left);
-}
-void drawMarker(ImDrawList* draw, ImVec2 min, ImVec2 max, double low, double high) {
-    const auto s = state();
-    if (!s.replaying || high <= low || s.frequency < low || s.frequency >= high) return;
-    const float x = min.x + float((s.frequency - low) / (high - low)) * (max.x - min.x);
-    draw->AddLine(ImVec2(x, min.y), ImVec2(x, max.y), IM_COL32(255, 192, 76, 220));
-    draw->AddText(ImVec2(x + 4, min.y + 4), IM_COL32(255, 205, 115, 255), "IQ");
 }
 void drawMap(void* owner, ImDrawList* draw, ImVec2 min, ImVec2 max, int head, int filled,
     int height, double low, double high) {
@@ -97,9 +124,15 @@ void drawMap(void* owner, ImDrawList* draw, ImVec2 min, ImVec2 max, int head, in
             const auto& m = it->second;
             nlohmann::json rows = nlohmann::json::array();
             for (const auto& at : m.displayed) rows.push_back({at.epoch, at.sample});
-            return nlohmann::json{{"min", {m.min.x, m.min.y}}, {"max", {m.max.x, m.max.y}},
+            auto result = nlohmann::json{{"min", {m.min.x, m.min.y}}, {"max", {m.max.x, m.max.y}},
                 {"low", m.low}, {"high", m.high}, {"rows", rows},
-                {"last_click", {m.lastClick.x, m.lastClick.y}}, {"selected_row", m.selectedRow}}.dump();
+                {"last_click", {m.lastClick.x, m.lastClick.y}}, {"selected_row", m.selectedRow}};
+            const auto vfo = gui::waterfall.vfos.find(gui::waterfall.selectedVFO);
+            if (vfo != gui::waterfall.vfos.end() && vfo->second) {
+                result["indicator_x"] = vfo->second->lineMin.x;
+                result["live_vfo_frequency"] = gui::waterfall.getCenterFrequency() + vfo->second->generalOffset;
+            }
+            return result.dump();
         }, nullptr, httpdebug::procfs::Type::String);
     }
     if (ImGui::BeginPopup("beige_waterfall_context")) {
@@ -117,10 +150,6 @@ void drawMap(void* owner, ImDrawList* draw, ImVec2 min, ImVec2 max, int head, in
         const double delay = s.storage.rate && s.storage.captured >= s.cursor.sample
             ? double(s.storage.captured - s.cursor.sample) / s.storage.rate : 0;
         snprintf(label, sizeof(label), "IQ REPLAY | %.6f MHz | -%.2fs", s.frequency / 1e6, delay);
-        if (high > low && s.frequency >= low && s.frequency < high) {
-            const float x = min.x + float((s.frequency - low) / (high - low)) * (max.x - min.x);
-            draw->AddLine(ImVec2(x, min.y), ImVec2(x, max.y), IM_COL32(255, 192, 76, 220));
-        }
         uint64_t best = std::numeric_limits<uint64_t>::max(); int row = -1;
         for (size_t i = 0; i < map.displayed.size(); ++i) {
             const auto& stamp = map.displayed[i];

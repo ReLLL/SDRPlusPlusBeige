@@ -1,6 +1,7 @@
 #include <iq_replay/framer.h>
 #include <iq_replay/rows.h>
 #include <iq_replay/retention.h>
+#include <iq_replay/navigation.h>
 #include <cassert>
 #include <limits>
 #include <random>
@@ -11,6 +12,29 @@ using namespace beige::iqreplay;
 static Stamp stamp(uint64_t sample, uint64_t epoch = 7) { return {epoch, sample, 800000, 7100000, 100}; }
 
 int main() {
+    const TuneContext context{"Radio", 8, 7100000, 7120000};
+    PendingTune click;
+    click.start(7080000, context, 1, .3);
+    assert(click.preview(context) == 7080000);
+    assert(!click.take(1.1, false, context));
+    assert(!click.take(1.4, true, context));
+    assert(click.take(1.4, false, context) == 7080000);
+    assert(click.preview(context) == 7080000); // Avoid a one-frame indicator flash before commit.
+    assert(!click.take(1.5, false, context));
+    click.start(7080000, context, 1, .3);
+    click.cancel(); // A double-click or deliberate drag supersedes single tune.
+    assert(!click.take(2, false, context));
+    for (TuneContext changed : {TuneContext{"Other", 8, 7100000, 7120000},
+             TuneContext{"Radio", 9, 7100000, 7120000}, TuneContext{"Radio", 8, 7200000, 7120000},
+             TuneContext{"Radio", 8, 7100000, 7120100}}) {
+        click.start(7080000, context, 1, .3);
+        assert(!click.preview(changed) && !click.take(2, false, changed));
+    }
+    assert(arrowFrequency(7123456, 1000, 1, true, false) == 7123556);
+    assert(arrowFrequency(7123456, 1000, -1, true, false) == 7123356);
+    assert(arrowFrequency(7123456.5, 5000, 1, true, true) == 7123556.5);
+    assert(arrowFrequency(7120000, 1000, 1, false, false) == 7121000);
+    assert(arrowFrequency(7120000, 1000, -1, false, true) == 7119900);
     const auto plan = Retention::plan(800000, 20, 400);
     assert(plan.capacity == 17920000 && plan.seconds == 22.4);
     assert(!Retention::plan(800000, 20, 401).replace(plan.capacity));

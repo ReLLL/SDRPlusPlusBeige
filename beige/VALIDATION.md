@@ -1,5 +1,15 @@
 # Beige validation
 
+## Single-click tuning and one frequency indicator (October 23, 1.3.47)
+
+The live waterfall handler reserved the first click for possible IQ seeking but never committed an ordinary single-click tune. It now previews that click immediately, then sends it through ordinary tuning after the double-click recognition window. Double-click, drag, receiver/epoch/revision changes, external tuning and layout changes cancel stale actions. This preserves history while distinguishing a double-click in center mode. The existing red indicator and filter outline project the preview or replay frequency through drawing coordinates only; live VFO offsets remain unchanged. The extra vertical IQ line is removed, while the horizontal time marker remains. Shift+Left/Right changes frequency by exactly 100 Hz in Live and replay without rounding the starting frequency.
+
+All 29 CTests, ABI comparison, bundle signatures, Python/Ruff and whitespace checks pass. The production click-state tests run normally and under AddressSanitizer: delayed commit, held clicks, cancellation, stale contexts, single delivery and uninterrupted preview are covered. The shared arrow calculation checks both 100 Hz directions, off-grid/fractional frequencies, normal snap and Alt. The full audio integration passes again; existing-indicator positions at 7.120/7.080/7.120 MHz and restored Live differ from expected pixels by only 0.025 pixels while live frequency stays at 7.120 MHz.
+
+One native live single click at the tested coordinate tunes from 7.120 to 7.061 MHz with unchanged RF center and free-tuning flags. Subsequent native key and double-click attempts do not deliver consistent events and are not counted as passing tests. A title-bar click improved one delivery but is not a reliable automation remedy. Physical keyboard/double-click confirmation remains pending. Private evidence: `/tmp/beige-iq-qa-20261023/smoke47.json`, `native47-results.json` and `build47-final.log`.
+
+Installed 1.3.47 loads 39 normal-profile instances, receives RTL-SDR IQ and 102240 audio-history frames, projects a 100 Hz replay retune to within 0.35 pixels of its expected position, and restores Live with unchanged RF frequency, VFO offset and tuning mode. All 137 checked preference/plugin/resource files remain unchanged; exit code is zero. Test instances are closed.
+
 ## Replay keyboard Live transitions (October 23, 1.3.46)
 
 Down over the graph now starts IQ replay directly from Live at the selected Radio's tuned frequency, relative to the actual capture head. Up reaching or crossing the newest retained sample invokes the shared Live action; it no longer gets stuck below the top on a fractional-second tail. Existing step sizes and focus guards remain. Disabled, empty, insufficient and not-yet-written history are rejected safely. Up while live does nothing.
