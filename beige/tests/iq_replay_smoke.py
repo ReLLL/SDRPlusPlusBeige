@@ -91,6 +91,8 @@ def main():
         'file_source', 'radio', 'noise_reduction_logmmse', 'null_audio_sink', 'recorder'])
     req('/sdr/stop')
     req('/proc/iq-replay/enabled', 'false')
+    req('/proc/iq-replay/time-step', '-1')
+    assert not status()['enabled'] and not status()['replaying']
     command('File%20Source', 'set_path', args.fixture)
     command('Radio', 'set_demod', 'AM')
     command('Radio', 'set_bandwidth', '8000')
@@ -105,6 +107,8 @@ def main():
     req('/sdr/stop')
     req('/proc/iq-replay/enabled', 'true')
     wait(lambda s: s['ready'])
+    req('/proc/iq-replay/time-step', '-1')
+    assert status()['enabled'] and not status()['replaying'], 'Empty history must stay live'
     req('/sdr/start')
     wait(lambda s: s['head'] >= 800000 * 8)
     results['capture'] = performance(3)
@@ -112,6 +116,24 @@ def main():
     time.sleep(.2)
     head = status()['head']
     assert head < 800000 * 24, status()
+
+    # Down starts from the live capture head at the selected live VFO, while
+    # Up crossing the newest retained point must return fully to Live.
+    req('/vfo/set_offset?name=Radio&offset=-20000')
+    req('/proc/iq-replay/time-step', '1')
+    assert not status()['replaying'], 'Up while live should stay live'
+    before = status()
+    req('/proc/iq-replay/time-step', '-1')
+    after = status()
+    assert after['replaying'] and after['receiver'] == 'Radio' and after['frequency'] == 7080000
+    assert after['selected_sample'] == before['head'] - before['rate'], (before, after)
+    results['down_from_live'] = tone(1800)
+    seek(head - 40000, 7080000)
+    req('/proc/iq-replay/time-step', '.1')
+    assert not status()['replaying'], 'Up must cross the fractional tail into Live'
+    assert json.loads(req('/proc/audio-rewind/status'))['live']
+    results['up_fractional_tail_returns_live'] = True
+    req('/vfo/set_offset?name=Radio&offset=20000')
     results['tones'] = []
     for sample, frequency, expected in [(800000, 7120000, 400), (800000 * 7, 7120000, 600), (800000, 7080000, 1800)]:
         seek(sample, frequency)
@@ -162,7 +184,7 @@ def main():
         assert after['revision'] > before['revision'] and after['replaying']
         results['time_steps'].append(tone(expected))
     before = status()
-    for seconds in ['-1e30', '1e30', '-1e308', '1e308', 'nan', 'inf', '-inf', '0']:
+    for seconds in ['-1e30', '-1e308', 'nan', 'inf', '-inf', '0']:
         req('/proc/iq-replay/time-step', seconds)
         after = status()
         assert after['replaying'] and after['revision'] == before['revision']

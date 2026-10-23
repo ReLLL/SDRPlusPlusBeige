@@ -217,15 +217,29 @@ bool tune(double frequency) {
 }
 bool shiftTime(double seconds) {
     const auto s = state();
-    if (!s.replaying || !std::isfinite(seconds) || seconds == 0 || !s.cursor.rate) return false;
-    const long double sample = static_cast<long double>(s.cursor.sample) + std::round(static_cast<long double>(seconds) * s.cursor.rate);
-    if (!std::isfinite(sample) || sample < s.storage.oldest() || sample >= s.storage.captured) {
-        notice(seconds < 0 ? "Reached the oldest retained IQ history." : "Reached the newest retained IQ history.");
+    if (!std::isfinite(seconds) || seconds == 0) return false;
+    const auto& receiver = gui::waterfall.selectedVFO;
+    const bool replay = s.replaying && s.receiver == receiver;
+    if (!replay && seconds > 0) return false;
+    if (!s.enabled) { notice("Enable Waterfall replay in Radio to seek back in time."); return false; }
+    const auto vfo = gui::waterfall.vfos.find(receiver);
+    if (vfo == gui::waterfall.vfos.end() || !vfo->second) return false;
+    if (!s.storage.ready || !s.storage.rate || !s.storage.captured) {
+        notice("IQ history is still filling. Try again shortly."); return false;
+    }
+    auto at = replay ? s.cursor : Stamp{s.storage.epoch, s.storage.head, s.storage.rate, s.storage.center, s.storage.utcNs};
+    const double frequency = replay ? s.frequency : gui::waterfall.getCenterFrequency() + vfo->second->generalOffset;
+    const long double sample = static_cast<long double>(at.sample) + std::round(static_cast<long double>(seconds) * at.rate);
+    if (!std::isfinite(sample) || sample < s.storage.oldest()) {
+        notice(replay ? "Reached the oldest retained IQ history." : "Not enough retained IQ history for that step.");
         return false;
     }
-    auto at = s.cursor;
+    if (sample >= s.storage.captured) {
+        if (replay && seconds > 0) { rewind::live(); return true; }
+        notice("That IQ history is still being saved. Try again shortly."); return false;
+    }
     at.sample = static_cast<uint64_t>(sample);
-    return seek(s.receiver, at, s.frequency);
+    return seek(receiver, at, frequency);
 }
 size_t read(const std::string& name, uint64_t revision, dsp::complex_t* output, size_t count) {
     std::shared_ptr<Store> saved; Stamp at;

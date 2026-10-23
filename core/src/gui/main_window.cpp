@@ -1163,20 +1163,23 @@ void MainWindow::updateWaterfallZoomBandwidth(float bw) {
 void MainWindow::handleWaterfallInput(ImGui::WaterfallVFO* vfo) {
     if (!lockWaterfallControls && ImGui::GetTopMostPopupModal() == NULL) {
         const auto replay = beige::iqreplay::state();
-        if (replay.replaying && replay.receiver == gui::waterfall.selectedVFO) {
-            const bool hovered = ImGui::IsMouseHoveringRect(gui::waterfall.fftAreaMin, gui::waterfall.fftAreaMax) ||
-                ImGui::IsMouseHoveringRect(gui::waterfall.wfMin, gui::waterfall.wfMax);
-            if (!vfo || !hovered) return;
-            if (!ImGui::GetIO().WantTextInput && !ImGui::IsAnyItemActive() && !gui::freqSelect.digitHovered &&
-                !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId)) {
-                int timeSteps = 0;
-                if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) ++timeSteps;
-                if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) --timeSteps;
-                double seconds = 1;
-                if (ImGui::GetIO().KeyShift) seconds = 10;
-                else if (ImGui::GetIO().KeyAlt) seconds = .1;
-                if (timeSteps) { beige::iqreplay::shiftTime(seconds * timeSteps); return; }
+        const bool selectedReplay = replay.replaying && replay.receiver == gui::waterfall.selectedVFO;
+        const bool hovered = ImGui::IsMouseHoveringRect(gui::waterfall.fftAreaMin, gui::waterfall.fftAreaMax) ||
+            ImGui::IsMouseHoveringRect(gui::waterfall.wfMin, gui::waterfall.wfMax);
+        if (vfo && hovered && !ImGui::GetIO().WantTextInput && !ImGui::IsAnyItemActive() &&
+            !gui::freqSelect.digitHovered && !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId)) {
+            int timeSteps = 0;
+            if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) ++timeSteps;
+            if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) --timeSteps;
+            double seconds = 1;
+            if (ImGui::GetIO().KeyShift) seconds = 10;
+            else if (ImGui::GetIO().KeyAlt) seconds = .1;
+            if (timeSteps && (selectedReplay || timeSteps < 0)) {
+                beige::iqreplay::shiftTime(seconds * timeSteps); return;
             }
+        }
+        if (selectedReplay) {
+            if (!vfo || !hovered) return;
             double step = vfo->snapInterval;
             if (ImGui::IsKeyDown(ImGuiKey_LeftShift)) step *= 10;
             else if (ImGui::IsKeyDown(ImGuiKey_LeftAlt)) step *= .1;

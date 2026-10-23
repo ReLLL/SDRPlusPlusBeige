@@ -139,8 +139,8 @@ void drawMap(void* owner, ImDrawList* draw, ImVec2 min, ImVec2 max, int head, in
         if (at && at.epoch == s.storage.epoch && at.sample >= s.storage.oldest() && at.sample < s.storage.captured) {
             const double frequency = low + (p.x - min.x) / (max.x - min.x) * (high - low);
             ImGui::SetTooltip(s.replaying
-                ? "Replay %.6f MHz at -%.3fs\nClick or drag to tune at the current replay time.\nDouble-click to change time and frequency.\nUp/Down: newer/older by 1s (Shift: 10s, Alt: 0.1s).\nPlugins remain live."
-                : "Replay %.6f MHz at -%.3fs\nDouble-click to listen. Plugins remain live.", frequency / 1e6,
+                ? "Replay %.6f MHz at -%.3fs\nClick or drag to tune at the current replay time.\nDouble-click to change time and frequency.\nUp/Down: newer/older by 1s (Shift: 10s, Alt: 0.1s).\nUp at the newest point returns Live. Plugins remain live."
+                : "Replay %.6f MHz at -%.3fs\nDouble-click to listen, or press Down to replay 1s back at the tuned frequency.\nShift: 10s, Alt: 0.1s. Plugins remain live.", frequency / 1e6,
                 double(s.storage.captured - at.sample) / at.rate);
         }
     }

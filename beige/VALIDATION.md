@@ -1,12 +1,20 @@
 # Beige validation
 
+## Replay keyboard Live transitions (October 23, 1.3.46)
+
+Down over the graph now starts IQ replay directly from Live at the selected Radio's tuned frequency, relative to the actual capture head. Up reaching or crossing the newest retained sample invokes the shared Live action; it no longer gets stuck below the top on a fractional-second tail. Existing step sizes and focus guards remain. Disabled, empty, insufficient and not-yet-written history are rejected safely. Up while live does nothing.
+
+All 29 CTests, ABI comparison, packaged signatures, Python/Ruff and whitespace checks pass. The packaged smoke verifies that disabled/empty history stays live, Up while live is inert, and Down selects exactly capture-head minus one second at the live VFO's frequency. Its resulting 1798.83 Hz tone has zero steady underruns. Up from a 0.05-second stopped tail using a 0.1-second step returns both IQ and audio rewind to Live. Existing time/frequency, mode, Recorder, boundary and storage recovery checks pass again.
+
+Installed normal-profile testing loads 39 instances, receives RTL-SDR IQ and 95040 audio-history frames, enters replay with Down, and returns to Live with Up. Live frequency, RF center, VFO offset and tuning mode remain unchanged. All 137 checked preference/plugin/resource files match the baseline; exit code is zero and test instances are closed. Native keyboard delivery was already accepted in 1.3.45; physical confirmation of these two new transitions remains pending. Private results: `/tmp/beige-iq-qa-20261023/smoke46.json`, `normal46-result.json` and `build46.log`.
+
 ## Replay time keys (October 23, 1.3.45)
 
 Up/Down over the spectrum or waterfall during IQ replay step one second newer/older. Shift selects ten seconds and Alt/Option selects 0.1 seconds. Held keys repeat. Text entry, active controls and popups retain their keys. Time seeking preserves the historical frequency and live RF/plugin/audio-history paths; unavailable targets leave playback unchanged with a boundary notice.
 
 All 29 CTests, plugin ABI, package signatures, Python/Ruff and whitespace checks pass. The packaged integration smoke checks relative forward/backward sample positions, unchanged frequency/generation/live RF, and actual 597.66 -> 498.05 Hz audio after three-second time jumps. Both 0.1-second directions on the other carrier retain its 1798.83 Hz tone. All steady tone checks report zero underruns. Huge finite values, nonfinite input, zero and outside-history requests preserve the replay revision. Existing frequency tuning, mode, Recorder isolation, independent audio rewind, stopped-tail and filesystem recovery checks pass again.
 
-The native automation click/key attempt leaves both frequency and replay revision unchanged, matching the earlier failure to deliver graph input. It is not counted as a keyboard pass; physical shortcut acceptance is pending. Private evidence: `/tmp/beige-iq-qa-20261023/smoke45.json` and `build45.log`.
+The native automation click/key attempt leaves both frequency and replay revision unchanged, matching the earlier failure to deliver graph input. It is not counted as a keyboard pass. Oz subsequently confirms that the time keys work correctly in installed 1.3.45. He then requests Down to enter replay from Live and Up to reach Live at the top; those additions follow in 1.3.46. Private evidence: `/tmp/beige-iq-qa-20261023/smoke45.json` and `build45.log`.
 
 Installed 1.3.45 loads all 39 normal-profile instances, captures live RTL-SDR IQ and 79680 live audio-history frames, ignores time steps while live, and exits with code zero. All 137 checked preference/plugin/resource files remain unchanged. Bundle signature verification passes; all test instances are closed.
 
