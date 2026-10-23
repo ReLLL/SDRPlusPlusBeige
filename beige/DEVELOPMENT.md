@@ -56,6 +56,16 @@ DX Notebook's SQLite database uses SQLite's read-only backup API so committed WA
 
 Normal launches disable the HTTP debug server. For QA, explicitly pass `--http PORT`. Useful endpoints: `/proc/display/spectrum3d` (read/write boolean) and `/proc/display/spectrum-stats` (CPU drawing times, mesh size, rebuilds and history rows). CPU drawing time excludes the GPU's execution time.
 
+## Spectrum controls and shutdown
+
+Right-click either vertical Max/Min slider and choose Set Defaults to reset both levels to Max 0 dB and Min -120 dB. Shared constants also supply fresh-profile defaults. The graph, waterfall palette and saved settings update together.
+
+The padlock before Radio's Bandwidth setting defaults to locked. It controls graph edge dragging only; numeric bandwidth settings and modulation changes remain available. The choice is saved per Radio instance as `spectrumBandwidthLocked`, independently of a demodulator's intrinsic fixed-width flag. Both VFO-limit update paths must combine the flags. The Radio debug bandwidth response reports both saved and effective graph locks.
+
+Desktop shutdown stops reception and the IQ frontend, destroys consumer modules before Radio and device providers, then runs module end hooks. Module handles remain loaded. Destroy instances while GUI resources and audio sidecars still exist: DX Notebook's destructor must join its writer before static regex/configuration destruction. An early-return guard also destroys QSO startup audio, which starts before main even if resource validation fails.
+
+TETRA intentionally keeps its audio conversion/resampling chain alive while disabled so it can resume. Its destructor must explicitly stop those blocks after unregistering its listening stream, before their output stream mutexes are destroyed. A base `block` destructor runs too late for member-owned outputs.
+
 ## HAM band toolbar
 
 The toolbar offers 160m, 80m, 60m, 40m, 30m, 20m, 17m, 15m, 12m, 10m, 6m, 2m, 1.25m, 70cm, 33cm and 23cm in that order. Receive-navigation ranges and colors follow Oz's supplied chart. The presets are independent of the selected band-plan overlay.

@@ -1,5 +1,21 @@
 # Beige validation
 
+## Spectrum controls and shutdown crashes (October 23, 1.3.37)
+
+Right-clicking either Max or Min and choosing Set Defaults resets both to 0/-120 dB, updates the graph/palette and persists the pair. Native checks pass on the installed package. Radio's padlock defaults locked, permits numeric bandwidth edits and modulation changes, blocks graph resizing, and permits resizing when unlocked. Both saved choices survive restart; 2D and 3D input paths were checked in an isolated File profile. Native automation here needs explicit `clickCount: 1` as well as a held click; several omitted-count clicks did not reach ImGui and are not counted as successful tests.
+
+The 1.3.34 exit report places a DX Notebook writer inside a static regex during process teardown. The host called module end hooks without destroying instances, so the writer destructor/join never ran. Desktop shutdown now destroys consumers before Radio/device providers and runs end hooks only after instance destruction. A regression using the real ModuleManager verifies worker completion, provider lifetime and end-hook ordering. Three old-host timing trials did not reproduce the reported regex crash; that limits the reproduction evidence. Three corrected-host trials exited cleanly while an isolated bridge imported 500, 1000 and 2040 receptions. An earlier text-import fixture produced no rows and is excluded from active-writer evidence. All synthetic reception stores and CSVs stay outside the normal profile and are removed after testing.
+
+The second supplied 1.3.34 report came from an agent test with an incorrect resource path. QSO audio started before main and survived the resulting early return. A scope guard now destroys that startup audio before global stream/mutex teardown. The packaged regression verifies --help exits 0 and a missing resource directory exits 1 rather than a signal.
+
+The two 1.3.36 reports identify the same TETRA destruction fault, first in the full-profile test and then in a minimal reproducer. TETRA intentionally leaves conversion/resampling workers idle while disabled. Their implicit base destructors stopped too late, after member-owned stream mutex destruction. Explicit final stops fix that lifetime ordering. The old packaged reproducer aborts with -6; the correction passes ten alternating enabled/disabled cycles. The new reusable packaged smoke repeats ten cycles, followed by two checks after the script's final isolation assertions. Run with a new empty directory:
+
+```sh
+python3 beige/tests/shutdown_smoke.py --app '/Applications/SDR++Beige.app' --work /tmp/beige-shutdown-new --cycles 10
+```
+
+Installed 1.3.37 passes all 25 CTests, public plugin ABI comparison, Python/Ruff, whitespace, build and full package signature checks. Three normal-profile launches load all 39 instances, start RTL-SDR reception and exit 0. All 137 checked settings/plugin/resource files match the fresh pre-test baseline after every run. Rewind/export smoke also passes with finite stereo audio and matching retained 30/60-second WAV contents. These bounded checks do not establish long-run freedom from crashes. Private evidence: `/tmp/beige-level-defaults-20261023/`.
+
 ## Rewind shortcuts and listening acceptance (October 22, 1.3.34)
 
 Oz confirmed "Works well" on installed 1.3.33 when asked whether -10s replay preserves voice clarity and returns cleanly to Live. This supersedes the pending listening status below for those behaviors.

@@ -84,6 +84,7 @@ public:
     int createInstance(std::string name, std::string module);
     int deleteInstance(std::string name);
     int deleteInstance(ModuleManager::Instance* instance);
+    void shutdown();
 
     int enableInstance(std::string name);
     int disableInstance(std::string name);

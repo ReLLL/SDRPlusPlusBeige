@@ -2,6 +2,7 @@
 #include <filesystem>
 #include <utils/wstr.h>
 #include <utils/flog.h>
+#include <vector>
 
 ModuleManager::Module_t ModuleManager::loadModule(std::string path) {
     Module_t mod;
@@ -193,6 +194,27 @@ int ModuleManager::deleteInstance(std::string name) {
 int ModuleManager::deleteInstance(ModuleManager::Instance* instance) {
     flog::error("Delete instance not implemented");
     return -1;
+}
+
+void ModuleManager::shutdown() {
+    // Consumers detach while Radio and device providers still exist. Instance
+    // destructors join their workers before module/global resources can end.
+    std::vector<std::string> ordered;
+    auto priority = [](const std::string& module) {
+        if (module == "radio") return 1;
+        for (const std::string suffix : {"_source", "_sink"})
+            if (module.size() >= suffix.size() && module.compare(module.size() - suffix.size(), suffix.size(), suffix) == 0) return 2;
+        return 0;
+    };
+    for (int phase = 0; phase < 3; ++phase)
+        for (const auto& [name, instance] : instances)
+            if (priority(instance.module.info->name) == phase) ordered.push_back(name);
+    for (const auto& name : ordered) {
+        if (instances.find(name) == instances.end()) continue;
+        flog::info("Stopping module instance '{}'", name);
+        deleteInstance(name);
+    }
+    for (auto& [name, module] : modules) module.end();
 }
 
 int ModuleManager::enableInstance(std::string name) {

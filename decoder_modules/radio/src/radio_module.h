@@ -22,6 +22,7 @@
 #include "radio_interface.h"
 #include "demod.h"
 #include "radio_module_interface.h"
+#include "bandwidth_lock.h"
 
 extern ConfigManager config;
 
@@ -73,6 +74,7 @@ public:
             created = true;
         }
         selectedDemodID = config.conf[name]["selectedDemodId"];
+        spectrumBandwidthLocked = config.conf[name].value("spectrumBandwidthLocked", true);
         config.release(created);
 
         // Initialize the VFO
@@ -235,6 +237,8 @@ public:
                    ", \"upper_offset\": " + std::to_string(upperOffset) +
                    ", \"module_bandwidth\": " + std::to_string(bandwidth) +
                    ", \"min_bandwidth\": " + std::to_string(minBandwidth) +
+                   ", \"spectrum_bandwidth_locked\": " + (spectrumBandwidthLocked ? "true" : "false") +
+                   ", \"graph_bandwidth_locked\": " + (vfo->wtfVFO->bandwidthLocked ? "true" : "false") +
                    ", \"max_bandwidth\": " + std::to_string(maxBandwidth) + "}";
         }
         if (cmd == "list_demods") {
@@ -536,6 +540,15 @@ private:
         ImGui::EndGroup();
 
         if (!_this->bandwidthLocked) {
+            if (bandwidthLockButton(("##spectrum_bandwidth_lock_" + _this->name).c_str(), _this->spectrumBandwidthLocked)) {
+                _this->spectrumBandwidthLocked = !_this->spectrumBandwidthLocked;
+                _this->vfo->setBandwidthLimits(_this->minBandwidth, _this->maxBandwidth,
+                    _this->bandwidthLocked || _this->spectrumBandwidthLocked);
+                config.acquire();
+                config.conf[_this->name]["spectrumBandwidthLocked"] = _this->spectrumBandwidthLocked;
+                config.release(true);
+            }
+            ImGui::SameLine();
             ImGui::LeftLabel("Bandwidth");
             const ImVec2 width = ImGui::CalcTextSize("123456    +    -    ");
             ImGui::SetNextItemWidth(width.x);
@@ -832,7 +845,7 @@ private:
 
         // Configure VFO
         if (vfo) {
-            vfo->setBandwidthLimits(minBandwidth, maxBandwidth, selectedDemod->getBandwidthLocked());
+            vfo->setBandwidthLimits(minBandwidth, maxBandwidth, selectedDemod->getBandwidthLocked() || spectrumBandwidthLocked);
             vfo->setReference(selectedDemod->getVFOReference());
             vfo->setSnapInterval(snapInterval);
             vfo->setSampleRate(ifSamplerate, bandwidth);
@@ -900,7 +913,7 @@ private:
             minBandwidth = selectedDemod->getMinBandwidth();
             maxBandwidth = selectedDemod->getMaxBandwidth();
             bandwidth = selectedDemod->getIFSampleRate();
-            vfo->setBandwidthLimits(minBandwidth, maxBandwidth, selectedDemod->getBandwidthLocked());
+            vfo->setBandwidthLimits(minBandwidth, maxBandwidth, selectedDemod->getBandwidthLocked() || spectrumBandwidthLocked);
             vfo->setSampleRate(selectedDemod->getIFSampleRate(), bandwidth);
             return;
         }
@@ -1253,6 +1266,7 @@ private:
     float maxBandwidth;
     float bandwidth;
     bool bandwidthLocked;
+    bool spectrumBandwidthLocked = true;
     int snapInterval;
     int selectedDemodID = 1;
     bool postProcEnabled;

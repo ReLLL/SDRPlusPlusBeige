@@ -20,6 +20,7 @@
 #include <core.h>
 #include <gui/menus/source.h>
 #include <gui/menus/display.h>
+#include <gui/spectrum_defaults.h>
 #include <gui/menus/bandplan.h>
 #include <gui/menus/sink.h>
 #include <gui/menus/vfo_color.h>
@@ -821,6 +822,24 @@ void MainWindow::draw() {
     }
 
 
+    auto levelContextMenu = [&](const char* id) {
+        if (ImGui::BeginPopupContextItem(id, ImGuiPopupFlags_MouseButtonRight)) {
+            if (ImGui::MenuItem("Set Defaults")) {
+                fftMin = gui::spectrumdefaults::minimum;
+                fftMax = gui::spectrumdefaults::maximum;
+                core::configManager.acquire();
+                core::configManager.conf["min"] = fftMin;
+                core::configManager.conf["max"] = fftMax;
+                core::configManager.release(true);
+                gui::waterfall.setFFTMin(fftMin);
+                gui::waterfall.setWaterfallMin(fftMin);
+                gui::waterfall.setFFTMax(fftMax);
+                gui::waterfall.setWaterfallMax(fftMax);
+            }
+            ImGui::EndPopup();
+        }
+    };
+
     auto addMaxSlider = [&]() {
         ImGui::NewLine();
         ImGui::SetCursorPosX((ImGui::GetWindowSize().x / 2.0) - (ImGui::CalcTextSize("Max").x / 2.0));
@@ -847,6 +866,7 @@ void MainWindow::draw() {
             gui::waterfall.setFFTMax(fftMax);
             gui::waterfall.setWaterfallMax(fftMax);
         }
+        levelContextMenu("##max_level_context");
     };
 
     auto addMinSlider = [&]() {
@@ -863,6 +883,7 @@ void MainWindow::draw() {
             gui::waterfall.setFFTMin(fftMin);
             gui::waterfall.setWaterfallMin(fftMin);
         }
+        levelContextMenu("##min_level_context");
     };
 
     if (displaymenu::phoneLayout) {

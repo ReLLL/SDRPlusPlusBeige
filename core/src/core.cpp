@@ -17,6 +17,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <gui/menus/display.h>
+#include <gui/spectrum_defaults.h>
 #include <http_debug_server.h>
 #include <audio/rewind.h>
 #include <thread>
@@ -436,6 +437,11 @@ extern void test1();
 
 // main
 int sdrpp_main(int argc, char* argv[]) {
+    // QSO audio starts during static construction, even when startup later fails.
+    // Stop it before global streams and mutexes are destroyed on every return.
+    struct StartupAudioCleanup {
+        ~StartupAudioCleanup() { gui::mainWindow.qsoPanel.reset(); }
+    } startupAudioCleanup;
 
 
 #ifdef _WIN32
@@ -571,7 +577,7 @@ int sdrpp_main(int argc, char* argv[]) {
     defConfig["frequency"] = 100000000.0;
     defConfig["fullWaterfallUpdate"] = false;
     defConfig["zoomBw"] = 1.0;
-    defConfig["max"] = 0.0;
+    defConfig["max"] = gui::spectrumdefaults::maximum;
     defConfig["maximized"] = false;
     defConfig["fullscreen"] = false;
     defConfig["theme"] = "Dark";
@@ -628,7 +634,7 @@ int sdrpp_main(int argc, char* argv[]) {
 #else
     defConfig["menuWidth"] = 300;
 #endif
-    defConfig["min"] = -120.0;
+    defConfig["min"] = gui::spectrumdefaults::minimum;
 
     // Module instances
     defConfig["moduleInstances"]["Airspy Source"]["module"] = "airspy_source";
@@ -922,19 +928,16 @@ int sdrpp_main(int argc, char* argv[]) {
     backend::renderLoop();
 
     gui::mainWindow.end();
-    beige::rewind::shutdown();
 
     // On android, none of this shutdown should happen due to the way the UI works
 #ifndef __ANDROID__
-    // Shut down all modules
-    for (auto& [name, mod] : core::moduleManager.modules) {
-        mod.end();
-    }
+    gui::mainWindow.setPlayState(false);
+    sigpath::iqFrontEnd.stop();
+    core::moduleManager.shutdown();
+    beige::rewind::shutdown();
 
     // Terminate backend (TODO: CHECK RETURN VALUE)
     backend::end();
-
-    sigpath::iqFrontEnd.stop();
 
     std::cout << "Save freq: " << core::configManager.conf["frequency"] << std::endl;
     core::configManager.disableAutoSave();

@@ -133,6 +133,10 @@ public:
         }
         gui::menu.removeEntry(name);
         sigpath::sinkManager.unregisterStream(name);
+        // disable() keeps the listening chain alive for re-enable. Final
+        // destruction must stop it before its output streams lose their mutexes.
+        outconv.stop();
+        resamp.stop();
     }
 
     void postInit() {}
