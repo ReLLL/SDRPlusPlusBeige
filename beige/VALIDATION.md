@@ -1,5 +1,15 @@
 # Beige validation
 
+## Band categories (October 23, 1.3.48)
+
+Installed 1.3.48 adds the saved HAM/Broadcast/Utility selector before the band buttons. HAM retains its original colors and ranges; Broadcast has 17 copper/amber presets and Utility has 16 steel-blue/teal presets. Category changes preserve frequency, modulation, tuning mode and active IQ replay. Band clicks still center the selected range without changing free/center mode. Receive-window scope and primary references are in [BAND-PRESETS.md](BAND-PRESETS.md).
+
+All 30 CTests, the public plugin ABI comparison, package signatures, Python/Ruff and whitespace checks pass. The packaged integration checks all 49 presets in each tuning mode and repeats the original 16-band HAM smoke in both modes. Rendered rectangles fit without overlap in two inline rows at 1440 points and below the controls at 1024 points; native screenshots confirm the full Broadcast label and distinct palettes. The installed 1920-point window shows a single HAM row. Missing, non-string and unknown preferences fall back to HAM; Utility and Broadcast selections restore after restart.
+
+Four category changes during paced IQ replay preserve RF state, replay revision, epoch and frequency while the cursor advances with zero audio underruns. An initial unpaced File-source test exhausted retained history and is excluded; the corrected test enables the existing Null sink pacing before capture. Installed normal-profile testing loads 39 instances, receives RTL-SDR IQ and 94080 audio-history frames, and exits zero with all 137 checked preference/plugin/resource files unchanged. Beige is closed after testing.
+
+Native coordinate clicks did not open the combo reliably in the automation session and are excluded from interaction evidence. Oz subsequently confirmed that all categories switch correctly in installed 1.3.48: popup selection updates the label and band buttons, with copper/amber Broadcast colors and blue/teal Utility colors. Physical acceptance is complete. Private build logs, smoke results and installation receipt: `/tmp/beige-bands-qa-20261023/`.
+
 ## Single-click tuning and one frequency indicator (October 23, 1.3.47)
 
 The live waterfall handler reserved the first click for possible IQ seeking but never committed an ordinary single-click tune. It now previews that click immediately, then sends it through ordinary tuning after the double-click recognition window. Double-click, drag, receiver/epoch/revision changes, external tuning and layout changes cancel stale actions. This preserves history while distinguishing a double-click in center mode. The existing red indicator and filter outline project the preview or replay frequency through drawing coordinates only; live VFO offsets remain unchanged. The extra vertical IQ line is removed, while the horizontal time marker remains. Shift+Left/Right changes frequency by exactly 100 Hz in Live and replay without rounding the starting frequency.

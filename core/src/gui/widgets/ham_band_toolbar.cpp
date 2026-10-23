@@ -1,6 +1,6 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "ham_band_toolbar.h"
-#include "ham_bands.h"
+#include "band_presets.h"
 #include <gui/gui.h>
 #include <gui/style.h>
 #include <gui/tuner.h>
@@ -10,10 +10,29 @@
 #include <algorithm>
 #include <array>
 #include <cfloat>
+#include <cmath>
 #include <string>
 
 namespace beige::bandtoolbar {
 namespace {
+
+BandCategory category = BandCategory::Ham;
+struct ButtonRect { float x, y, width, height; bool hovered; };
+struct ToolbarLayout {
+    BandCategory group = BandCategory::Ham;
+    float selectorX = 0, selectorY = 0, selectorWidth = 0, bottom = 0;
+    float meterX = 0, meterWidth = 0, windowWidth = 0;
+    bool below = false;
+    std::array<ButtonRect, maxBandCount> buttons{};
+} layout;
+
+void setCategory(BandCategory next) {
+    if (category == next) { return; }
+    category = next;
+    core::configManager.acquire();
+    core::configManager.conf["bandShortcutCategory"] = categoryLabel(category);
+    core::configManager.release(true);
+}
 
 void select(const HamBand& band) {
     const auto name = gui::waterfall.selectedVFO;
@@ -41,7 +60,7 @@ ImVec4 tint(uint32_t rgb, float factor) {
             (rgb & 255) / 255.0f * factor, 1};
 }
 
-void drawTooltip(const HamBand& band) {
+void drawTooltip(const HamBand& band, BandCategory group) {
     const float scale = style::uiScale;
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(14, 12) * scale);
     ImGui::PushStyleVar(ImGuiStyleVar_PopupRounding, 5 * scale);
@@ -58,7 +77,7 @@ void drawTooltip(const HamBand& band) {
     ImGui::Separator();
     ImGui::Spacing();
     ImGui::PushFont(style::tinyFont);
-    ImGui::TextDisabled("BEST TIME TO OPERATE");
+    ImGui::TextDisabled(group == BandCategory::Ham ? "BEST TIME TO OPERATE" : "BEST TIME TO LISTEN");
     ImGui::PopFont();
     ImGui::TextUnformatted(band.bestTime);
     ImGui::Spacing();
@@ -68,12 +87,14 @@ void drawTooltip(const HamBand& band) {
     ImGui::TextUnformatted(band.typicalUse);
     ImGui::Spacing();
     ImGui::PushFont(style::tinyFont);
-    ImGui::TextDisabled("TYPICAL DISTANCE");
+    ImGui::TextDisabled(group == BandCategory::Ham ? "TYPICAL DISTANCE" : "TYPICAL COVERAGE");
     ImGui::PopFont();
     ImGui::TextUnformatted(band.typicalDistance);
     ImGui::Spacing();
     ImGui::PushFont(style::tinyFont);
-    ImGui::TextDisabled("Approximate routine ranges; setup and conditions matter.");
+    ImGui::TextDisabled(group == BandCategory::Ham
+        ? "Approximate routine ranges; setup and conditions matter."
+        : "Receive search range. Activity varies by location and propagation. Choose the mode in Radio.");
     ImGui::PopFont();
     ImGui::PopTextWrapPos();
     ImGui::PopFont();
@@ -81,9 +102,66 @@ void drawTooltip(const HamBand& band) {
     ImGui::PopStyleVar(3);
 }
 
+bool useDarkText(const HamBand& band, BandCategory group, float factor) {
+    if (group == BandCategory::Ham) { return band.color == 0xCE891E || band.color == 0xDEB52D; }
+    const auto color = tint(band.color, factor);
+    const auto linear = [](float c) { return c <= 0.04045f ? c / 12.92f : std::pow((c + 0.055f) / 1.055f, 2.4f); };
+    const float luminance = 0.2126f * linear(color.x) + 0.7152f * linear(color.y) + 0.0722f * linear(color.z);
+    return luminance > 0.179f;
+}
+
 } // namespace
 
 void init() {
+    core::configManager.acquire();
+    const auto saved = core::configManager.conf.find("bandShortcutCategory");
+    category = BandCategory::Ham;
+    if (saved != core::configManager.conf.end() && saved->is_string()) {
+        parseCategory(saved->get<std::string>(), category);
+    }
+    core::configManager.release();
+    httpdebug::procfs::registerEndpoint("/display/band-category", []() {
+        return std::string(categoryLabel(category));
+    }, [](const std::string& label) {
+        BandCategory next;
+        if (parseCategory(label, next)) { setCategory(next); }
+    }, httpdebug::procfs::Type::String);
+    httpdebug::procfs::registerEndpoint("/display/band", []() {
+        for (const auto& band : bandsFor(category)) {
+            if (band.contains(gui::freqSelect.frequency)) { return std::string(band.label); }
+        }
+        return std::string{};
+    }, [](const std::string& label) {
+        for (const auto& band : bandsFor(category)) {
+            if (label == band.label) { select(band); return; }
+        }
+    }, httpdebug::procfs::Type::String);
+    httpdebug::procfs::registerEndpoint("/display/band-catalog", []() {
+        json groups = json::object();
+        for (const auto group : bandCategories) {
+            auto entries = json::array();
+            for (const auto& band : bandsFor(group)) {
+                entries.push_back({{"label", band.label}, {"lower", band.lowerHz},
+                    {"upper", band.upperHz}, {"color", band.color}});
+            }
+            groups[categoryLabel(group)] = entries;
+        }
+        return groups.dump();
+    }, nullptr, httpdebug::procfs::Type::String);
+    httpdebug::procfs::registerEndpoint("/display/band-layout", []() {
+        auto rectangles = json::array();
+        const auto bands = bandsFor(layout.group);
+        for (std::size_t i = 0; i < bands.size; ++i) {
+            const auto& r = layout.buttons[i];
+            rectangles.push_back({{"label", bands[i].label}, {"x", r.x}, {"y", r.y},
+                {"width", r.width}, {"height", r.height}, {"hovered", r.hovered}});
+        }
+        return json{{"category", categoryLabel(layout.group)}, {"selector_x", layout.selectorX},
+            {"selector_y", layout.selectorY}, {"selector_width", layout.selectorWidth},
+            {"bottom", layout.bottom}, {"below", layout.below}, {"meter_x", layout.meterX},
+            {"meter_width", layout.meterWidth}, {"window_width", layout.windowWidth},
+            {"buttons", rectangles}}.dump();
+    }, nullptr, httpdebug::procfs::Type::String);
     httpdebug::procfs::registerEndpoint("/display/ham-band", []() {
         for (const auto& band : hamBands) {
             if (band.contains(gui::freqSelect.frequency)) { return std::string(band.label); }
@@ -115,30 +193,46 @@ void draw(float snr, float topY) {
     const ImVec2 origin(ImGui::GetCursorPosX(), topY);
     const float right = ImGui::GetWindowSize().x - 80 * scale;
     const float available = right - origin.x;
-    std::array<float, hamBands.size()> widths{};
-    float rowWidths[2] = {0, 0}, singleWidth = 0;
-    for (std::size_t i = 0; i < hamBands.size(); ++i) {
-        widths[i] = ImGui::CalcTextSize(hamBands[i].label).x + 8 * scale;
-        rowWidths[i / 8] += widths[i] + (i % 8 ? gap : 0);
+    const auto group = category;
+    const auto bands = bandsFor(group);
+    // Reserve the full 28-point combo arrow plus both frame paddings.
+    const float selectorWidth = ImGui::CalcTextSize("Broadcast").x + 44 * scale;
+    std::array<float, maxBandCount> widths{};
+    float singleWidth = 0;
+    for (std::size_t i = 0; i < bands.size; ++i) {
+        widths[i] = ImGui::CalcTextSize(bands[i].label).x + 8 * scale;
         singleWidth += widths[i] + (i ? gap : 0);
     }
-    const float meterWidth = std::clamp(available - singleWidth - 16 * scale, 120 * scale, 300 * scale);
-    const float bandWidth = available - meterWidth - 16 * scale;
-    const bool below = bandWidth < (std::max)(rowWidths[0], rowWidths[1]);
+    const float meterWidth = std::clamp(available - selectorWidth - gap - singleWidth - 16 * scale, 120 * scale, 300 * scale);
+    const float bandWidth = available - meterWidth - 16 * scale - selectorWidth - gap;
+    const bool below = bandWidth < twoRowWidth(widths.data(), bands.size, gap);
     const ImVec2 bandOrigin = below ? ImVec2(8 * scale, topY + 46 * scale) : origin;
-    const float width = below ? ImGui::GetWindowSize().x - 16 * scale : bandWidth;
+    const ImVec2 buttonsOrigin = bandOrigin + ImVec2(selectorWidth + gap, 0);
+    const float width = below ? ImGui::GetWindowSize().x - 16 * scale - selectorWidth - gap : bandWidth;
     const bool oneRow = singleWidth <= width;
     const float height = (oneRow ? 28 : 19) * scale;
     float x = 0, y = oneRow && !below ? 6 * scale : 0;
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3 * scale);
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4, 2) * scale);
-    ImGui::PushID("beige_ham_bands");
-    for (std::size_t i = 0; i < hamBands.size(); ++i) {
-        const auto& band = hamBands[i];
+    ImGui::PushID("beige_band_shortcuts");
+    ImGui::SetCursorPos(bandOrigin + ImVec2(0, y));
+    ImGui::SetNextItemWidth(selectorWidth);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6 * scale, (height - ImGui::GetFontSize()) * 0.5f));
+    if (ImGui::BeginCombo("###category", categoryLabel(group), ImGuiComboFlags_HeightSmall)) {
+        for (const auto choice : bandCategories) {
+            const bool active = choice == category;
+            if (ImGui::Selectable(categoryLabel(choice), active)) { setCategory(choice); }
+            if (active) { ImGui::SetItemDefaultFocus(); }
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::PopStyleVar();
+    for (std::size_t i = 0; i < bands.size; ++i) {
+        const auto& band = bands[i];
         if (x && x + widths[i] > width) { x = 0; y += height + 2 * scale; }
-        ImGui::SetCursorPos(bandOrigin + ImVec2(x, y));
+        ImGui::SetCursorPos(buttonsOrigin + ImVec2(x, y));
         const bool selected = band.contains(gui::freqSelect.frequency);
-        const bool darkText = band.color == 0xCE891E || band.color == 0xDEB52D;
+        const bool darkText = useDarkText(band, group, selected ? 1.0f : 0.86f);
         ImGui::PushStyleColor(ImGuiCol_Button, tint(band.color, selected ? 1.0f : 0.86f));
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, tint(band.color, 1.10f));
         ImGui::PushStyleColor(ImGuiCol_ButtonActive, tint(band.color, 0.72f));
@@ -149,7 +243,8 @@ void draw(float snr, float topY) {
         const bool hovered = ImGui::IsItemHovered();
         ImGui::PopStyleVar();
         ImGui::PopStyleColor(5);
-        if (hovered) { drawTooltip(band); }
+        if (hovered) { drawTooltip(band, group); }
+        layout.buttons[i] = {buttonsOrigin.x + x, buttonsOrigin.y + y, widths[i], height, hovered};
         x += widths[i] + gap;
     }
     ImGui::PopID();
@@ -162,6 +257,15 @@ void draw(float snr, float topY) {
     if (meterWidth < 180 * scale) { ImGui::PopFont(); }
     // Reserve the entire toolbar height even after the caller places its logo.
     const float bottom = (std::max)(topY + 40 * scale, bandOrigin.y + y + height);
+    layout.group = group;
+    layout.selectorX = bandOrigin.x;
+    layout.selectorY = bandOrigin.y + (oneRow && !below ? 6 * scale : 0);
+    layout.selectorWidth = selectorWidth;
+    layout.bottom = bottom;
+    layout.below = below;
+    layout.meterX = right - meterWidth;
+    layout.meterWidth = meterWidth;
+    layout.windowWidth = ImGui::GetWindowSize().x;
     ImGui::SetCursorPos(ImVec2(8 * scale, topY));
     ImGui::Dummy(ImVec2(right - 8 * scale, bottom - topY));
 }

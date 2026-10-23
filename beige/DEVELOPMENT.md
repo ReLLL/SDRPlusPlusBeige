@@ -70,6 +70,8 @@ TETRA intentionally keeps its audio conversion/resampling chain alive while disa
 
 ## HAM band toolbar
 
+The saved HAM/Broadcast/Utility selector now precedes the shortcuts. Read [BAND-PRESETS.md](BAND-PRESETS.md) for the new catalogs, palette families, regional assumptions and checks. The following HAM behavior remains unchanged.
+
 The toolbar offers 160m, 80m, 60m, 40m, 30m, 20m, 17m, 15m, 12m, 10m, 6m, 2m, 1.25m, 70cm, 33cm and 23cm in that order. Receive-navigation ranges and colors follow Oz's supplied chart. The presets are independent of the selected band-plan overlay.
 
 Centers in MHz, in the same order: 1.900, 3.750, 5.36750, 7.150, 10.125, 14.175, 18.114, 21.225, 24.940, 28.850, 52.000, 146.000, 223.500, 435.000, 915.000 and 1270.000. Tooltips show the band, frequency range, best operating time, typical use and typical distance. The center frequency is intentionally omitted.
