@@ -1,4 +1,5 @@
 #include "rewind.h"
+#include <iq_replay/replay.h>
 #include <imgui.h>
 #include <gui/style.h>
 #include <algorithm>
@@ -39,11 +40,14 @@ void draw(const std::string& streamName, bool receiving) {
     if (ImGui::Button(s.paused ? "Play###pause" : "Pause###pause", ImVec2(58 * style::uiScale, 0))) pause(!s.paused);
     tip("Pause or resume audio. Incoming audio continues filling the history.\nThe oldest audio expires after 60 seconds, including while paused.");
     ImGui::SameLine();
-    const ImVec4 liveColor = s.live ? ImVec4(.12f, .42f, .30f, 1) : ImVec4(.48f, .31f, .10f, 1);
+    if (!hasAudio) ImGui::EndDisabled();
+    const bool iqReplay = iqreplay::state().replaying;
+    const ImVec4 liveColor = s.live && !iqReplay ? ImVec4(.12f, .42f, .30f, 1) : ImVec4(.48f, .31f, .10f, 1);
     ImGui::PushStyleColor(ImGuiCol_Button, liveColor);
     if (ImGui::Button("Live", ImVec2(42 * style::uiScale, 0))) live();
     ImGui::PopStyleColor();
-    tip("Return immediately to live audio.");
+    tip("Return immediately to live RF and audio, ending waterfall IQ replay and audio rewind.");
+    if (!hasAudio) ImGui::BeginDisabled();
     if (!split) ImGui::SameLine();
     float position = -float(s.delay);
     const float reserve = (roomy ? 228 : 142) * style::uiScale;
@@ -53,7 +57,8 @@ void draw(const std::string& streamName, bool receiving) {
     tip("Scrub through the selected receiver's audio history.\nThe spectrum and waterfall continue showing current RF, not replayed RF.\nRetuning keeps earlier audio in the history.");
     ImGui::SameLine();
     const float statusX = ImGui::GetCursorPosX();
-    if (s.live) ImGui::TextColored(ImVec4(.35f, .82f, .60f, 1), "LIVE");
+    if (s.live && iqReplay) ImGui::TextColored(ImVec4(1, .75f, .35f, 1), "IQ");
+    else if (s.live) ImGui::TextColored(ImVec4(.35f, .82f, .60f, 1), "LIVE");
     else ImGui::TextColored(ImVec4(1, .75f, .35f, 1), "-%04.1fs", s.delay);
     ImGui::SameLine();
     ImGui::SetCursorPosX(statusX + 60 * style::uiScale);

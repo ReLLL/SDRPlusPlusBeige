@@ -13,6 +13,8 @@
 #include <thread>
 #include <chrono>
 #include <cmath>
+#include <array>
+#include <mutex>
 
 #define CONCAT(a, b) ((std::string(a) + b).c_str())
 
@@ -74,6 +76,9 @@ public:
     }
 
     SinkManager::Stream* _stream;
+    std::string audioSnapshot() { return ns.snapshot(); }
+    bool realtime() { return ns.realtime; }
+    void realtime(bool value) { ns.realtime = value; }
 
 private:
     // Custom null sink DSP block that counts samples
@@ -81,27 +86,49 @@ private:
     public:
         std::atomic<int64_t>* counter;
         std::atomic<int64_t>* invalid;
+        std::atomic<float>* sampleRate;
+        std::mutex audioMutex;
+        std::array<float, 8192> recent{};
+        size_t head = 0, filled = 0;
+        std::atomic<bool> realtime{false};
+        std::chrono::steady_clock::time_point next{};
+        std::string snapshot() {
+            std::lock_guard<std::mutex> lock(audioMutex);
+            json values = json::array();
+            for (size_t i = 0; i < filled; ++i) values.push_back(recent[(head + recent.size() - filled + i) % recent.size()]);
+            return values.dump();
+        }
         
-        CountingNull(std::atomic<int64_t>* counter, std::atomic<int64_t>* invalid) : counter(counter), invalid(invalid) {}
+        CountingNull(std::atomic<int64_t>* counter, std::atomic<int64_t>* invalid, std::atomic<float>* rate) : counter(counter), invalid(invalid), sampleRate(rate) {}
         
         int run() override {
             int count = _in->read();
             if (count < 0) { return -1; }
             if (count > 0) {
+                std::lock_guard<std::mutex> lock(audioMutex);
                 int bad = 0;
                 for (int i = 0; i < count; ++i) {
                     const auto& sample = _in->readBuf[i];
                     if (!std::isfinite(sample.l) || !std::isfinite(sample.r)) ++bad;
+                    recent[head] = std::isfinite(sample.l) ? sample.l : 0;
+                    head = (head + 1) % recent.size(); filled = std::min(filled + 1, recent.size());
                 }
                 *invalid += bad;
                 *counter += count;
+            }
+            if (count && realtime) {
+                const auto now = std::chrono::steady_clock::now();
+                if (next < now - std::chrono::milliseconds(100)) next = now;
+                next += std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                    std::chrono::duration<double>(double(count) / std::max(1.0f, sampleRate->load())));
+                std::this_thread::sleep_until(next);
             }
             _in->flush();
             return count;
         }
     };
 
-    CountingNull ns{&totalSamples, &invalidSamples};
+    CountingNull ns{&totalSamples, &invalidSamples, &currentSampleRate};
     bool running = false;
 };
 
@@ -113,6 +140,11 @@ public:
         provider.ctx = this;
 
         sigpath::sinkManager.registerSinkProvider("NullAudioSink", provider);
+        httpdebug::procfs::registerEndpoint("/null_audio_sink/audio",
+            [this]() { return sink ? sink->audioSnapshot() : "[]"; }, nullptr, httpdebug::procfs::Type::String);
+        httpdebug::procfs::registerEndpoint("/null_audio_sink/realtime",
+            [this]() { return sink && sink->realtime() ? "true" : "false"; },
+            [this](const std::string& value) { if (sink) sink->realtime(value == "true"); }, httpdebug::procfs::Type::Bool);
         httpdebug::procfs::registerEndpoint("/null_audio_sink/invalid_samples",
             [this]() { return sink ? std::to_string(sink->invalidSamples.load()) : "0"; },
             nullptr, httpdebug::procfs::Type::Int);
@@ -176,6 +208,8 @@ public:
 
     ~NullAudioSinkModule() {
         httpdebug::procfs::unregister("/null_audio_sink/samples");
+        httpdebug::procfs::unregister("/null_audio_sink/audio");
+        httpdebug::procfs::unregister("/null_audio_sink/realtime");
         httpdebug::procfs::unregister("/null_audio_sink/invalid_samples");
         httpdebug::procfs::unregister("/null_audio_sink/sample_rate");
         httpdebug::procfs::unregister("/null_audio_sink/status");

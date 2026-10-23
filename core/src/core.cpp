@@ -20,6 +20,7 @@
 #include <gui/spectrum_defaults.h>
 #include <http_debug_server.h>
 #include <audio/rewind.h>
+#include <iq_replay/replay.h>
 #include <thread>
 #include <mutex>
 #include <unordered_map>
@@ -440,7 +441,7 @@ int sdrpp_main(int argc, char* argv[]) {
     // QSO audio starts during static construction, even when startup later fails.
     // Stop it before global streams and mutexes are destroyed on every return.
     struct StartupAudioCleanup {
-        ~StartupAudioCleanup() { gui::mainWindow.qsoPanel.reset(); }
+        ~StartupAudioCleanup() { beige::iqreplay::shutdown(); gui::mainWindow.qsoPanel.reset(); }
     } startupAudioCleanup;
 
 
@@ -927,6 +928,7 @@ int sdrpp_main(int argc, char* argv[]) {
 
     backend::renderLoop();
 
+    beige::iqreplay::live();
     gui::mainWindow.end();
 
     // On android, none of this shutdown should happen due to the way the UI works
@@ -934,6 +936,7 @@ int sdrpp_main(int argc, char* argv[]) {
     gui::mainWindow.setPlayState(false);
     sigpath::iqFrontEnd.stop();
     core::moduleManager.shutdown();
+    beige::iqreplay::shutdown();
     beige::rewind::shutdown();
 
     // Terminate backend (TODO: CHECK RETURN VALUE)

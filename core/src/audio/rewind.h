@@ -17,6 +17,8 @@ State state();
 void seek(double seconds);
 void pause(bool value);
 void live();
+void current();
+void current(const std::string& receiver);
 bool enabled();
 void enable(bool value);
 struct ExportState { bool busy = false; std::string path, error; double seconds = 0; };

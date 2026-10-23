@@ -4,6 +4,7 @@
 #include <signal_path/signal_path.h>
 #include <core.h>
 #include <http_debug_server.h>
+#include <iq_replay/replay.h>
 
 namespace {
     std::string currentSourceType;
@@ -133,6 +134,7 @@ void SourceManager::tune(double freq) {
     selectedHandler->tuneHandler(abs(((tuneMode == TuningMode::NORMAL) ? (freq + tuneOffset) : ifFreq)), selectedHandler->ctx);
     onRetune.emit(freq + tuneOffset);
     currentFreq = freq;
+    beige::iqreplay::retune(freq);
     onTuneChanged.emit(freq);
 }
 

@@ -3,6 +3,7 @@
 #include <signal_path/signal_path.h>
 #include <core.h>
 #include <http_debug_server.h>
+#include <iq_replay/replay.h>
 #include <filesystem>
 #include <fstream>
 #include <future>
@@ -24,6 +25,7 @@ std::atomic<bool> receiving{false};
 std::atomic<void*> playbackKey{nullptr};
 class Capture : public dsp::Processor<dsp::stereo_t, dsp::stereo_t> {
 public:
+    void* key = nullptr;
     std::shared_ptr<Buffer> history = std::make_shared<Buffer>();
     int sampleRate;
     bool audioMode = true;
@@ -34,21 +36,23 @@ public:
     ~Capture() override { stop(); }
     int run() override {
         auto current = history->state();
-        const bool offline = !receiving && current.head && current.rate;
+        const bool offline = !receiving && ((current.head && current.rate) || iqreplay::listeningActive(key));
         int count = offline && !_in->isDataReady() ? 0 : _in->readFor(std::chrono::milliseconds(100));
         if (count < 0) return -1;
         if (count > 0) {
             for (int offset = 0; offset < count; offset += 4096) {
                 const int chunk = std::min(4096, count - offset);
                 history->process(_in->readBuf + offset, out.writeBuf, chunk);
+                routeIQ(chunk);
                 if (!out.swap(chunk)) { _in->flush(); return -1; }
             }
             _in->flush();
             return count;
         }
         else if (offline) {
-            count = std::max(1, current.rate / 100);
+            count = std::max(1, sampleRate / 100);
             history->renderStopped(out.writeBuf, count);
+            routeIQ(count);
             const auto now = std::chrono::steady_clock::now();
             nextTick = std::max(nextTick, now) + std::chrono::milliseconds(10);
             std::this_thread::sleep_until(nextTick);
@@ -56,6 +60,20 @@ public:
         return count && !out.swap(count) ? -1 : count;
     }
 private:
+    void routeIQ(int count) {
+        const bool active = iqreplay::listeningActive(key) && iqreplay::renderAudio(key, out.writeBuf, count, history->state().live);
+        if (active != wasIQ) { wasIQ = active; fadeRemaining = std::max(1, sampleRate / 200); fadeStart = last; }
+        const int length = std::max(1, sampleRate / 200);
+        for (int i = 0; i < count && fadeRemaining; ++i, --fadeRemaining) {
+            const float mix = 1 - float(fadeRemaining) / length;
+            out.writeBuf[i].l = fadeStart.l * (1 - mix) + out.writeBuf[i].l * mix;
+            out.writeBuf[i].r = fadeStart.r * (1 - mix) + out.writeBuf[i].r * mix;
+        }
+        if (count) last = out.writeBuf[count - 1];
+    }
+    bool wasIQ = false;
+    int fadeRemaining = 0;
+    dsp::stereo_t last{}, fadeStart{};
     std::chrono::steady_clock::time_point nextTick{};
 };
 
@@ -136,6 +154,7 @@ ExportState writeClip(const std::shared_ptr<Buffer>& history, const State& at, i
 
 dsp::stream<dsp::stereo_t>* connect(void* key, dsp::stream<dsp::stereo_t>* input, int rate) {
     auto instance = std::make_unique<Capture>(input, rate);
+    instance->key = key;
     auto* output = &instance->out;
     captures[key] = std::move(instance);
     return output;
@@ -155,7 +174,7 @@ void setRate(void* key, int rate) {
     if (selected == it->second.get()) selected->history->configure(featureEnabled && selected->audioMode ? rate : 0);
 }
 void setReceiving(bool value) { receiving = value; }
-bool playbackActive(void* key) { return key && playbackKey.load(std::memory_order_relaxed) == key; }
+bool playbackActive(void* key) { return key && (playbackKey.load(std::memory_order_relaxed) == key || iqreplay::listeningActive(key)); }
 void select(const std::string& name) {
     initialize();
     auto stream = sigpath::sinkManager.streams.find(name);
@@ -184,7 +203,14 @@ void select(const std::string& name) {
 State state() { return selected ? selected->history->state() : State{}; }
 void seek(double seconds) { if (selected) selected->history->seek(seconds); }
 void pause(bool value) { if (selected) selected->history->setPaused(value); }
-void live() { if (selected) selected->history->goLive(); }
+void current() { if (selected) selected->history->goLive(); }
+void current(const std::string& receiver) {
+    const auto stream = sigpath::sinkManager.streams.find(receiver);
+    if (stream == sigpath::sinkManager.streams.end()) return;
+    const auto it = captures.find(stream->second);
+    if (it != captures.end()) it->second->history->goLive();
+}
+void live() { iqreplay::live(); current(); }
 bool enabled() { return featureEnabled; }
 void enable(bool value) {
     if (featureEnabled == value) return;

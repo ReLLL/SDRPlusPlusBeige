@@ -40,6 +40,8 @@ RTL-SDR desktop Auto/Manual gain and nominal hardware bandwidth controls use an 
 
 Desktop audio rewind uses core-owned sidecar state without changing public SinkManager/Stream layouts. Read [AUDIO-REWIND.md](AUDIO-REWIND.md) before changing its transport, WAV export or sink lifecycle.
 
+Optional [waterfall IQ replay](IQ-REPLAY.md) uses temporary disk storage sized from visible rows and FFT sample spacing. Double-click seeks time and frequency through a separate Radio listening decoder. Keep plugins, Recorder and the existing audio history live; only the shared Live actions return both transports. Preserve row stamps alongside the raw FFT ring and use the previously displayed snapshot for input.
+
 The Codec2 compatibility header is generated inside the build folder from the detected library version when the Homebrew bottle omits it. No global dependency headers are modified.
 
 ## Private profile import

@@ -6,6 +6,7 @@
 #include <core.h>
 #include <ctm.h>
 #include "signal_path/signal_path.h"
+#include <iq_replay/replay.h>
 
 IQFrontEnd::~IQFrontEnd() {
     if (!_init) { return; }
@@ -83,11 +84,13 @@ void IQFrontEnd::init(dsp::stream<dsp::complex_t>* in, double sampleRate, bool b
 }
 
 void IQFrontEnd::setInput(dsp::stream<dsp::complex_t>* in) {
+    beige::iqreplay::invalidate();
     this->_currentStreamTime = 0;
     inBuf.setInput(in);
 }
 
 void IQFrontEnd::setSampleRate(double sampleRate) {
+    beige::iqreplay::invalidate();
     // Temp stop the necessary blocks
     dcBlock.tempStop();
     for (auto& [name, vfo] : vfos) {
@@ -236,8 +239,8 @@ void IQFrontEnd::start() {
     }
 
     // Start FFT chain
-    reshape.start();
-    fftSink.start();
+    if (beige::iqreplay::enabled()) setReplayFraming(true);
+    else { reshape.start(); fftSink.start(); }
 }
 
 void IQFrontEnd::stop() {
@@ -256,12 +259,27 @@ void IQFrontEnd::stop() {
     }
 
     // Stop FFT chain
+    beige::iqreplay::stopFramer();
     reshape.stop();
     fftSink.stop();
 }
 
 double IQFrontEnd::getEffectiveSamplerate() {
     return effectiveSr;
+}
+
+void IQFrontEnd::setReplayFraming(bool enabled) {
+    if (!_init) return;
+    beige::iqreplay::stopFramer();
+    reshape.stop();
+    fftSink.stop();
+    if (enabled) {
+        const int interval = std::max(1, int(std::round(effectiveSr / _fftRate)));
+        beige::iqreplay::startFramer(&fftIn, effectiveSr, _nzFFTSize, interval,
+            [this](dsp::complex_t* data, int count) { handler(data, count, this); });
+    } else {
+        reshape.start(); fftSink.start();
+    }
 }
 
 void IQFrontEnd::handler(dsp::complex_t* data, int count, void* ctx) {
@@ -288,6 +306,8 @@ void IQFrontEnd::handler(dsp::complex_t* data, int count, void* ctx) {
 
 void IQFrontEnd::updateFFTPath(bool updateWaterfall) {
     // Temp stop branch
+    const bool replayFraming = beige::iqreplay::enabled();
+    if (replayFraming) beige::iqreplay::stopFramer();
     reshape.tempStop();
     fftSink.tempStop();
 
@@ -320,6 +340,11 @@ void IQFrontEnd::updateFFTPath(bool updateWaterfall) {
     if (updateWaterfall) { gui::waterfall.setRawFFTSize(_fftSize); }
 
     // Restart branch
+    if (replayFraming) {
+        reshape.tempStart(); fftSink.tempStart();
+        setReplayFraming(true);
+        return;
+    }
     reshape.tempStart();
     fftSink.tempStart();
 }

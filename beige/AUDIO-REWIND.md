@@ -1,5 +1,7 @@
 # Desktop audio rewind
 
+The Live action also ends optional [waterfall IQ replay](IQ-REPLAY.md), even with audio history disabled or empty. Other audio controls and live-history WAV exports remain independent of the IQ cursor. The historical Radio listening decoder is selected after live audio capture, so it cannot overwrite the audio-history ring or Recorder taps.
+
 Read when: changing audio transport, retained history, WAV export, sink lifecycle or the desktop rewind strip.
 
 ## User behavior

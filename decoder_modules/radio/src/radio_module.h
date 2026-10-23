@@ -23,6 +23,8 @@
 #include "demod.h"
 #include "radio_module_interface.h"
 #include "bandwidth_lock.h"
+#include "iq_replay_radio.h"
+#include <iq_replay/ui.h>
 
 extern ConfigManager config;
 
@@ -370,6 +372,8 @@ public:
 
 
     ~RadioModule() {
+        beige::iqreplay::removeRadio(name);
+        iqReplay.reset();
         sigpath::txState.unbindHandler(&txHandler);
         core::modComManager.unregisterInterface(name);
         gui::menu.removeEntry(name);
@@ -426,6 +430,14 @@ public:
 
 
     void postInit() override {
+        iqReplay = std::make_unique<IQReplayRadio>(name);
+        beige::iqreplay::registerRadio(name, [this] {
+            if (!enabled || !selectedDemod) { beige::iqreplay::live(); return; }
+            config.acquire(); const auto settings = config.conf[name]; config.release();
+            const auto deempMode = deempModes[deempId];
+            const double tau = deempAllowed && deempMode != DEEMP_MODE_NONE ? deempTaus[deempMode] : 0;
+            iqReplay->update(selectedDemodID, bandwidth, audioSampleRate, highPass && highPassAllowed, tau, settings);
+        }, [this] { if (iqReplay) iqReplay->stop(); });
         // Select the demodulator
         if (enabled) {
             if (!selectDemodByID((DemodID) selectedDemodID)) {
@@ -459,6 +471,7 @@ public:
     }
 
     void disable() override {
+        if (beige::iqreplay::state().receiver == name) beige::iqreplay::live();
         enabled = false;
         ifChain.stop();
         ifSplitter.stop();
@@ -539,6 +552,7 @@ private:
 
         ImGui::EndGroup();
 
+        beige::iqreplay::drawSetting();
         if (!_this->bandwidthLocked) {
             if (bandwidthLockButton(("##spectrum_bandwidth_lock_" + _this->name).c_str(), _this->spectrumBandwidthLocked)) {
                 _this->spectrumBandwidthLocked = !_this->spectrumBandwidthLocked;
@@ -1267,6 +1281,7 @@ private:
     float bandwidth;
     bool bandwidthLocked;
     bool spectrumBandwidthLocked = true;
+    std::unique_ptr<IQReplayRadio> iqReplay;
     int snapInterval;
     int selectedDemodID = 1;
     bool postProcEnabled;

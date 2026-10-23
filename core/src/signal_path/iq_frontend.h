@@ -58,6 +58,7 @@ public:
 
     void start();
     void stop();
+    void setReplayFraming(bool enabled);
 
     double getEffectiveSamplerate();
 

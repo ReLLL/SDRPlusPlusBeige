@@ -35,6 +35,7 @@
 #include <gui/widgets/snr_meter.h>
 #include <gui/widgets/ham_band_toolbar.h>
 #include <audio/rewind.h>
+#include <iq_replay/replay.h>
 #include <gui/tuner.h>
 #include <dsp/buffer/buffer.h>
 #include <utils/wstr.h>
@@ -284,6 +285,9 @@ void MainWindow::vfoAddedHandler(VFOManager::VFO* vfo, void* ctx) {
 }
 
 void MainWindow::preDraw(ImGui::WaterfallVFO** vfo) {
+    beige::iqreplay::tick();
+    const auto iqNotice = beige::iqreplay::takeNotice();
+    if (!iqNotice.empty()) ImGui::InsertNotification({ImGuiToastType_Warning, 10000, "%s", iqNotice.c_str()});
 
     *vfo = NULL;
     if (gui::waterfall.selectedVFO != "") {
@@ -940,6 +944,7 @@ void MainWindow::draw() {
 void MainWindow::setPlayState(bool _playing) {
     if (_playing == playing) { return; }
     if (_playing) {
+        beige::iqreplay::invalidate();
         gui::waterfall.clearSpectrumHistory();
         sigpath::iqFrontEnd.flushInputBuffer();
         sigpath::sourceManager.start();

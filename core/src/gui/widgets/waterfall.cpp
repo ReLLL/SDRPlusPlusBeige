@@ -17,6 +17,7 @@
 #include "utils/strings.h"
 #include <gui/menus/display.h>
 #include <chrono>
+#include <iq_replay/ui.h>
 
 #define MEASURE_LOCK_GUARD(mtx)                                       \
     auto t0 = currentTimeMillis();                                    \
@@ -325,6 +326,10 @@ namespace ImGui {
         }
 
         afterWaterfallDraw.emit(WaterfallDrawArgs{ window, wfMin, wfMax });
+        const ImVec2 replayMin(int(wfMin.x), int(wfMin.y));
+        const ImVec2 replayMax(replayMin.x + dataWidth, replayMin.y + waterfallHeight);
+        beige::iqreplay::drawMap(this, window->DrawList, replayMin, replayMax, currentFFTLine,
+            fftLines, waterfallHeight, lowerFreq, upperFreq);
     }
 
 
@@ -528,7 +533,7 @@ namespace ImGui {
 
             if (viewBandwidth != wholeBandwidth) {
                 updateAllVFOs();
-                if (_fullUpdate) { updateWaterfallFb(); };
+                if (_fullUpdate || beige::iqreplay::enabled()) { updateWaterfallFb(); };
             }
             return;
         }
@@ -555,7 +560,7 @@ namespace ImGui {
 
             if (viewBandwidth != wholeBandwidth) {
                 updateAllVFOs();
-                if (_fullUpdate) { updateWaterfallFb(); };
+                if (_fullUpdate || beige::iqreplay::enabled()) { updateWaterfallFb(); };
             }
             return;
         }
@@ -583,7 +588,7 @@ namespace ImGui {
 
             if (viewBandwidth != wholeBandwidth) {
                 updateAllVFOs();
-                if (_fullUpdate) { updateWaterfallFb(); };
+                if (_fullUpdate || beige::iqreplay::enabled()) { updateWaterfallFb(); };
             }
             return;
         }
@@ -949,6 +954,7 @@ namespace ImGui {
         }
 
         int lastWaterfallHeight = waterfallHeight;
+        const int lastFFTHead = currentFFTLine;
 
         if (waterfallVisible) {
             FFTAreaHeight = std::min<int>(FFTAreaHeight, widgetSize.y - (50.0f * style::uiScale));
@@ -972,6 +978,7 @@ namespace ImGui {
 
         if (waterfallVisible) {
             // Raw FFT resize
+            beige::iqreplay::resizeRows(this, lastFFTHead, lastWaterfallHeight, waterfallHeight);
             fftLines = std::min<int>(fftLines, waterfallHeight) - 1;
             if (rawFFTs != NULL) {
                 if (currentFFTLine != 0) {
@@ -1018,7 +1025,7 @@ namespace ImGui {
         if (waterfallVisible) {
             delete[] waterfallFb;
             // allocate extra rows, will be used to create continuous pixels for textures
-            const int sz = dataWidth * (waterfallHeight + 128);
+            const int sz = dataWidth * (waterfallHeight + std::max(128, waterfallMaxSectionHeight));
             // flog::info("onresize: waterfallHeight={} sz={}", waterfallHeight, sz);
             waterfallFb = new uint32_t[sz];
             memset(waterfallFb, 0, sz * sizeof(uint32_t));
@@ -1049,6 +1056,9 @@ namespace ImGui {
         range = findBestRange(viewBandwidth, maxHSteps);
         vRange = findBestRange(fftMax - fftMin, maxVSteps);
 
+        // Keep stopped replay history visible after a resize. A zero-height
+        // first texture section otherwise draws nothing until RF resumes.
+        if (beige::iqreplay::enabled() && waterfallVisible && fftLines > 0) waterfallHeadSectionHeight = 1;
         updateWaterfallFb("resize2");
         updateAllVFOs();
     }
@@ -1097,7 +1107,16 @@ namespace ImGui {
             args.highFreq = upperFreq;
             args.freqToPixelRatio = (double)dataWidth / viewBandwidth;
             args.pixelToFreqRatio = viewBandwidth / (double)dataWidth;
-            onInputProcess.emit(args);
+            const ImVec2 replayMin(int(wfMin.x), int(wfMin.y));
+            bool liveBorder = false;
+            for (const auto& [name, vfo] : vfos) {
+                if (!vfo->bandwidthLocked && (ImGui::IsMouseHoveringRect(vfo->wfLbwSelMin, vfo->wfLbwSelMax) ||
+                    ImGui::IsMouseHoveringRect(vfo->wfRbwSelMin, vfo->wfRbwSelMax))) liveBorder = true;
+            }
+            inputHandled = !(fftResizeSelect || freqScaleSelect || vfoSelect || vfoBorderSelect || liveBorder) &&
+                beige::iqreplay::handleInput(this, replayMin,
+                    ImVec2(replayMin.x + dataWidth, replayMin.y + waterfallHeight), selectedVFO);
+            if (!inputHandled) onInputProcess.emit(args);
             if (!inputHandled) { processInputs(); }
         }
 
@@ -1152,6 +1171,7 @@ namespace ImGui {
         int drawDataStart = (((double)rawFFTSize / 2.0) * (offsetRatio + 1)) - (drawDataSize / 2);
 
         if (waterfallVisible) {
+            beige::iqreplay::pushRow(this, currentFFTLine, waterfallHeight);
             doZoom(drawDataStart, drawDataSize, rawFFTSize, dataWidth, &rawFFTs[currentFFTLine * rawFFTSize], latestFFT);
 
             waterfallHeadSectionHeight++;
@@ -1355,7 +1375,7 @@ namespace ImGui {
         lowerFreq = (centerFreq + viewOffset) - (viewBandwidth / 2.0);
         upperFreq = (centerFreq + viewOffset) + (viewBandwidth / 2.0);
         range = findBestRange(bandWidth, maxHSteps);
-        if (_fullUpdate) { updateWaterfallFb(); };
+        if (_fullUpdate || beige::iqreplay::enabled()) { updateWaterfallFb(); };
         updateAllVFOs();
     }
 
@@ -1378,7 +1398,7 @@ namespace ImGui {
         clearSpectrumHistory();
         lowerFreq = (centerFreq + viewOffset) - (viewBandwidth / 2.0);
         upperFreq = (centerFreq + viewOffset) + (viewBandwidth / 2.0);
-        if (_fullUpdate) { updateWaterfallFb(); };
+        if (_fullUpdate || beige::iqreplay::enabled()) { updateWaterfallFb(); };
         updateAllVFOs();
     }
 
@@ -1415,7 +1435,7 @@ namespace ImGui {
             return;
         }
         waterfallMin = min;
-        if (_fullUpdate) { updateWaterfallFb(); };
+        if (_fullUpdate || beige::iqreplay::enabled()) { updateWaterfallFb(); };
     }
 
     float WaterFall::getWaterfallMin() {
@@ -1428,7 +1448,7 @@ namespace ImGui {
             return;
         }
         waterfallMax = max;
-        if (_fullUpdate) { updateWaterfallFb(); };
+        if (_fullUpdate || beige::iqreplay::enabled()) { updateWaterfallFb(); };
     }
 
     float WaterFall::getWaterfallMax() {
@@ -1453,6 +1473,7 @@ namespace ImGui {
 
     void WaterFall::setRawFFTSize(int size) {
         MEASURE_LOCK_GUARD(buf_mtx);
+        beige::iqreplay::clearRows(this);
         rawFFTSize = size;
         int wfSize = std::max<int>(1, waterfallHeight);
         if (rawFFTs != NULL) {

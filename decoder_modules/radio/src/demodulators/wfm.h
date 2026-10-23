@@ -23,7 +23,13 @@ namespace demod {
 
         ~WFM() {
             stop();
+            if (!replayOnly) gui::waterfall.onFFTRedraw.unbindHandler(&fftRedrawHandler);
+        }
+
+        void listeningOnly() {
+            if (replayOnly) return;
             gui::waterfall.onFFTRedraw.unbindHandler(&fftRedrawHandler);
+            replayOnly = true;
         }
 
         void init(std::string name, ConfigManager* config, dsp::stream<dsp::complex_t>* input, double bandwidth, double audioSR) {
@@ -89,6 +95,7 @@ namespace demod {
 
         void start() {
             demod.start();
+            if (replayOnly) return;
             rdsDemod.start();
             hs.start();
             reshape.start();
@@ -352,6 +359,7 @@ namespace demod {
         RDSDemod rdsDemod;
         dsp::sink::Handler<uint8_t> hs;
         EventHandler<ImGui::WaterFall::FFTRedrawArgs> fftRedrawHandler;
+        bool replayOnly = false;
 
         dsp::buffer::Reshaper<float> reshape;
         dsp::sink::Handler<float> diagHandler;
