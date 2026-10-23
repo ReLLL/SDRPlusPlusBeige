@@ -69,6 +69,10 @@ void initialize() {
         [](const std::string& value) {
             try { tune(std::stod(value)); } catch (const std::exception&) { notice("Invalid replay frequency."); }
         }, Type::Float);
+    registerEndpoint("/iq-replay/time-step", [] { return "Signed seconds from the current IQ playback time"; },
+        [](const std::string& value) {
+            try { shiftTime(std::stod(value)); } catch (const std::exception&) { notice("Invalid replay time step."); }
+        }, Type::Float);
 }
 }
 
@@ -210,6 +214,18 @@ bool tune(double frequency) {
     if (!transport.replaying || transport.revision != s.revision) return false;
     transport.frequency = frequency;
     return true;
+}
+bool shiftTime(double seconds) {
+    const auto s = state();
+    if (!s.replaying || !std::isfinite(seconds) || seconds == 0 || !s.cursor.rate) return false;
+    const long double sample = static_cast<long double>(s.cursor.sample) + std::round(static_cast<long double>(seconds) * s.cursor.rate);
+    if (!std::isfinite(sample) || sample < s.storage.oldest() || sample >= s.storage.captured) {
+        notice(seconds < 0 ? "Reached the oldest retained IQ history." : "Reached the newest retained IQ history.");
+        return false;
+    }
+    auto at = s.cursor;
+    at.sample = static_cast<uint64_t>(sample);
+    return seek(s.receiver, at, s.frequency);
 }
 size_t read(const std::string& name, uint64_t revision, dsp::complex_t* output, size_t count) {
     std::shared_ptr<Store> saved; Stamp at;

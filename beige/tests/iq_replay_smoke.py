@@ -144,6 +144,32 @@ def main():
     for key in ['spectrum_center', 'vfo_offset', 'center_tuning', 'single_click_vfo']:
         assert live_before[key] == live_after[key], (key, live_before, live_after)
     assert live_after['frequency'] == 7120000, live_after
+
+    # Relative time navigation keeps frequency/live RF and rejects unavailable
+    # history without ending playback or overflowing its sample coordinate.
+    seek(2560000, 7120000)
+    tone(500)
+    results['time_steps'] = []
+    for seconds, expected, frequency in [(3, 600, 7120000), (-3, 500, 7120000),
+                                          (.1, 1800, 7080000), (-.1, 1800, 7080000)]:
+        req('/proc/iq-replay/frequency', str(frequency))
+        before = status()
+        req('/proc/iq-replay/time-step', str(seconds))
+        after = status()
+        target = before['cursor'] + round(seconds * before['rate'])
+        assert target <= after['selected_sample'] < target + before['rate'] * .2, (before, after)
+        assert after['frequency'] == frequency and after['epoch'] == before['epoch']
+        assert after['revision'] > before['revision'] and after['replaying']
+        results['time_steps'].append(tone(expected))
+    before = status()
+    for seconds in ['-1e30', '1e30', '-1e308', '1e308', 'nan', 'inf', '-inf', '0']:
+        req('/proc/iq-replay/time-step', seconds)
+        after = status()
+        assert after['replaying'] and after['revision'] == before['revision']
+        assert after['frequency'] == 7080000
+    live_after = json.loads(req('/proc/display/ham-band-state'))
+    for key in ['spectrum_center', 'vfo_offset', 'center_tuning', 'single_click_vfo']:
+        assert live_before[key] == live_after[key], (key, live_before, live_after)
     req('/proc/audio-rewind/live', 'true')
     time.sleep(.1)
     restored = json.loads(req('/proc/display/ham-band-state'))

@@ -1167,6 +1167,16 @@ void MainWindow::handleWaterfallInput(ImGui::WaterfallVFO* vfo) {
             const bool hovered = ImGui::IsMouseHoveringRect(gui::waterfall.fftAreaMin, gui::waterfall.fftAreaMax) ||
                 ImGui::IsMouseHoveringRect(gui::waterfall.wfMin, gui::waterfall.wfMax);
             if (!vfo || !hovered) return;
+            if (!ImGui::GetIO().WantTextInput && !ImGui::IsAnyItemActive() && !gui::freqSelect.digitHovered &&
+                !ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId)) {
+                int timeSteps = 0;
+                if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) ++timeSteps;
+                if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) --timeSteps;
+                double seconds = 1;
+                if (ImGui::GetIO().KeyShift) seconds = 10;
+                else if (ImGui::GetIO().KeyAlt) seconds = .1;
+                if (timeSteps) { beige::iqreplay::shiftTime(seconds * timeSteps); return; }
+            }
             double step = vfo->snapInterval;
             if (ImGui::IsKeyDown(ImGuiKey_LeftShift)) step *= 10;
             else if (ImGui::IsKeyDown(ImGuiKey_LeftAlt)) step *= .1;

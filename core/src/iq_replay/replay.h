@@ -29,6 +29,7 @@ void fault(const std::string& text);
 std::string takeNotice();
 bool seek(const std::string& receiver, const Stamp& at, double frequency);
 bool tune(double frequency);
+bool shiftTime(double seconds);
 void live();
 size_t read(const std::string& receiver, uint64_t revision, dsp::complex_t* output, size_t count);
 void audio(const std::string& receiver, uint64_t revision, const dsp::stereo_t* data, size_t count, int rate);

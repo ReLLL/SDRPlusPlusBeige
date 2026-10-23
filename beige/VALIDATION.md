@@ -1,5 +1,15 @@
 # Beige validation
 
+## Replay time keys (October 23, 1.3.45)
+
+Up/Down over the spectrum or waterfall during IQ replay step one second newer/older. Shift selects ten seconds and Alt/Option selects 0.1 seconds. Held keys repeat. Text entry, active controls and popups retain their keys. Time seeking preserves the historical frequency and live RF/plugin/audio-history paths; unavailable targets leave playback unchanged with a boundary notice.
+
+All 29 CTests, plugin ABI, package signatures, Python/Ruff and whitespace checks pass. The packaged integration smoke checks relative forward/backward sample positions, unchanged frequency/generation/live RF, and actual 597.66 -> 498.05 Hz audio after three-second time jumps. Both 0.1-second directions on the other carrier retain its 1798.83 Hz tone. All steady tone checks report zero underruns. Huge finite values, nonfinite input, zero and outside-history requests preserve the replay revision. Existing frequency tuning, mode, Recorder isolation, independent audio rewind, stopped-tail and filesystem recovery checks pass again.
+
+The native automation click/key attempt leaves both frequency and replay revision unchanged, matching the earlier failure to deliver graph input. It is not counted as a keyboard pass; physical shortcut acceptance is pending. Private evidence: `/tmp/beige-iq-qa-20261023/smoke45.json` and `build45.log`.
+
+Installed 1.3.45 loads all 39 normal-profile instances, captures live RTL-SDR IQ and 79680 live audio-history frames, ignores time steps while live, and exits with code zero. All 137 checked preference/plugin/resource files remain unchanged. Bundle signature verification passes; all test instances are closed.
+
 ## Replay frequency tuning and default (October 23, 1.3.44)
 
 Oz confirms that 1.3.43 double-click seeking and divider dragging work physically. He reports that replay cannot be retuned afterward. Build 1.3.44 adds frequency-only tuning through graph clicks/drags, the top frequency input, wheel and arrow keys. The golden IQ marker identifies historical listening. Double-click still chooses a new time/frequency; Live restores the live frequency display. New or missing preferences enable Waterfall replay by default, while a saved Off survives restart.
