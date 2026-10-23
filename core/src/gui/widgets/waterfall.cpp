@@ -1115,7 +1115,9 @@ namespace ImGui {
             }
             inputHandled = !(fftResizeSelect || freqScaleSelect || vfoSelect || vfoBorderSelect || liveBorder) &&
                 beige::iqreplay::handleInput(this, replayMin,
-                    ImVec2(replayMin.x + dataWidth, replayMin.y + waterfallHeight), selectedVFO);
+                    ImVec2(replayMin.x + dataWidth, replayMin.y + (waterfallVisible ? waterfallHeight : 0)),
+                    fftAreaMin, fftAreaMax, lowerFreq, upperFreq,
+                    selectedVFO.empty() ? 0 : vfos[selectedVFO]->snapInterval, selectedVFO);
             if (!inputHandled) onInputProcess.emit(args);
             if (!inputHandled) { processInputs(); }
         }
@@ -1127,6 +1129,7 @@ namespace ImGui {
             drawWaterfall();
         }
         drawVFOs();
+        beige::iqreplay::drawMarker(window->DrawList, fftAreaMin, fftAreaMax, lowerFreq, upperFreq);
         if (bandplan != NULL && bandplanVisible) {
             drawBandPlan();
         }

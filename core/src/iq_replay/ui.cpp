@@ -15,6 +15,7 @@ struct Map {
     ImVec2 min{}, max{};
     double low = 0, high = 0;
     bool seekingGesture = false;
+    bool tuningGesture = false;
     ImVec2 lastClick{};
     int selectedRow = -1;
 };
@@ -33,22 +34,36 @@ void clearRows(void* owner) { maps()[owner].rows.clear(); maps()[owner].displaye
 void pushRow(void* owner, int index, int height) {
     if (enabled()) maps()[owner].rows.put(index, height, frameStamp());
 }
-bool handleInput(void* owner, ImVec2 min, ImVec2 max, const std::string& receiver) {
+bool handleInput(void* owner, ImVec2 min, ImVec2 max, ImVec2 spectrumMin, ImVec2 spectrumMax,
+    double low, double high, double snap, const std::string& receiver) {
     auto& map = maps()[owner];
     const auto p = ImGui::GetMousePos();
-    if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) map.seekingGesture = false;
+    if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) map.seekingGesture = map.tuningGesture = false;
     const bool hovered = inside(p, min, max) && ImGui::IsWindowHovered();
     if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
         ImGui::OpenPopup("beige_waterfall_context"); return true;
     }
-    if (!enabled() || !hovered) return false;
+    const auto s = state();
+    const bool replay = s.replaying && s.receiver == receiver;
+    if (!replay) map.tuningGesture = false;
+    const bool spectrumHovered = replay && inside(p, spectrumMin, spectrumMax) && ImGui::IsWindowHovered();
+    if (!enabled() || (!hovered && !spectrumHovered && !map.tuningGesture)) return false;
+    const auto tuneAtPointer = [&] {
+        if (spectrumMax.x <= spectrumMin.x || p.x < spectrumMin.x || p.x >= spectrumMax.x || !std::isfinite(p.x)) return;
+        double frequency = low + (p.x - spectrumMin.x) / (spectrumMax.x - spectrumMin.x) * (high - low);
+        if (snap > 0) frequency = std::round(frequency / snap) * snap;
+        if (frequency != s.frequency) tune(frequency);
+    };
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         // The splitter's existing hit target overlaps the first two rows.
-        if (p.y <= min.y + 2 * style::uiScale) return false;
+        if (hovered && p.y <= min.y + 2 * style::uiScale) return false;
         map.seekingGesture = true;
-        // Reserve the first click so center tuning cannot invalidate the point
-        // before a second click. A deliberate drag returns to normal controls.
-        if (!ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) return true;
+        // Before replay, reserve the first click so center tuning cannot erase
+        // the historical point. During replay, clicks and drags tune only IQ.
+        if (!hovered || !ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+            if (replay) { map.tuningGesture = true; tuneAtPointer(); }
+            return true;
+        }
         // A resize invalidates the previous layout; never reinterpret its pixels.
         if (min.x != map.min.x || min.y != map.min.y || max.x != map.max.x || max.y != map.max.y ||
             map.max.x <= map.min.x || map.max.y <= map.min.y) {
@@ -60,8 +75,16 @@ bool handleInput(void* owner, ImVec2 min, ImVec2 max, const std::string& receive
         seek(receiver, at, frequency);
         return true;
     }
+    if (replay && map.tuningGesture && ImGui::IsMouseDown(ImGuiMouseButton_Left)) { tuneAtPointer(); return true; }
     if (map.seekingGesture && ImGui::IsMouseDragging(ImGuiMouseButton_Left)) map.seekingGesture = false;
     return map.seekingGesture && ImGui::IsMouseDown(ImGuiMouseButton_Left);
+}
+void drawMarker(ImDrawList* draw, ImVec2 min, ImVec2 max, double low, double high) {
+    const auto s = state();
+    if (!s.replaying || high <= low || s.frequency < low || s.frequency >= high) return;
+    const float x = min.x + float((s.frequency - low) / (high - low)) * (max.x - min.x);
+    draw->AddLine(ImVec2(x, min.y), ImVec2(x, max.y), IM_COL32(255, 192, 76, 220));
+    draw->AddText(ImVec2(x + 4, min.y + 4), IM_COL32(255, 205, 115, 255), "IQ");
 }
 void drawMap(void* owner, ImDrawList* draw, ImVec2 min, ImVec2 max, int head, int filled,
     int height, double low, double high) {
@@ -115,7 +138,9 @@ void drawMap(void* owner, ImDrawList* draw, ImVec2 min, ImVec2 max, int head, in
         const auto at = Rows::point(map.displayed, p.y - min.y);
         if (at && at.epoch == s.storage.epoch && at.sample >= s.storage.oldest() && at.sample < s.storage.captured) {
             const double frequency = low + (p.x - min.x) / (max.x - min.x) * (high - low);
-            ImGui::SetTooltip("Replay %.6f MHz at -%.3fs\nDouble-click to listen. Drag for live tuning. Plugins remain live.", frequency / 1e6,
+            ImGui::SetTooltip(s.replaying
+                ? "Replay %.6f MHz at -%.3fs\nClick or drag to tune at the current replay time.\nDouble-click to change time and frequency. Plugins remain live."
+                : "Replay %.6f MHz at -%.3fs\nDouble-click to listen. Plugins remain live.", frequency / 1e6,
                 double(s.storage.captured - at.sample) / at.rate);
         }
     }

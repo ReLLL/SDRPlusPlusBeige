@@ -322,6 +322,10 @@ void MainWindow::preDraw(ImGui::WaterfallVFO** vfo) {
     // Handle change in selected frequency
     if (gui::freqSelect.frequencyChanged) {
         gui::freqSelect.frequencyChanged = false;
+        const auto replay = beige::iqreplay::state();
+        if (replay.replaying && replay.receiver == gui::waterfall.selectedVFO) {
+            beige::iqreplay::tune(gui::freqSelect.frequency);
+        } else {
         tuner::tune(tuningMode, gui::waterfall.selectedVFO, gui::freqSelect.frequency);
         if (*vfo != NULL) {
             (*vfo)->centerOffsetChanged = false;
@@ -334,6 +338,7 @@ void MainWindow::preDraw(ImGui::WaterfallVFO** vfo) {
             core::configManager.conf["vfoOffsets"][gui::waterfall.selectedVFO] = (*vfo)->generalOffset;
         }
         core::configManager.release(true);
+        }
     }
 
     // Handle dragging the uency scale
@@ -358,6 +363,14 @@ void MainWindow::preDraw(ImGui::WaterfallVFO** vfo) {
         core::configManager.conf["fftHeight"] = fftHeight;
         core::configManager.release(true);
     }
+    static bool replayFrequencyShown = false;
+    const auto replay = beige::iqreplay::state();
+    const bool showingReplay = replay.replaying && replay.receiver == gui::waterfall.selectedVFO;
+    if (showingReplay) gui::freqSelect.setFrequency(replay.frequency);
+    else if (replayFrequencyShown)
+        gui::freqSelect.setFrequency(gui::waterfall.getCenterFrequency() + (*vfo ? (*vfo)->generalOffset : 0));
+    if (showingReplay || replayFrequencyShown) gui::freqSelect.frequencyChanged = false;
+    replayFrequencyShown = showingReplay;
 }
 
 void MainWindow::drawUpperLine(ImGui::WaterfallVFO* vfo) {
@@ -418,7 +431,8 @@ void MainWindow::drawUpperLine(ImGui::WaterfallVFO* vfo) {
         if (ImGui::ImageButton(icons::NORMAL_TUNING, btnSize, ImVec2(0, 0), ImVec2(1, 1), 5, ImVec4(0, 0, 0, 0), textCol)) {
             tuningMode = tuner::TUNER_MODE_CENTER;
             gui::waterfall.VFOMoveSingleClick = true;
-            tuner::tune(tuner::TUNER_MODE_CENTER, gui::waterfall.selectedVFO, gui::freqSelect.frequency);
+            if (!beige::iqreplay::state().replaying)
+                tuner::tune(tuner::TUNER_MODE_CENTER, gui::waterfall.selectedVFO, gui::freqSelect.frequency);
             core::configManager.acquire();
             core::configManager.conf["centerTuning"] = true;
             core::configManager.release(true);
@@ -1148,6 +1162,22 @@ void MainWindow::updateWaterfallZoomBandwidth(float bw) {
 
 void MainWindow::handleWaterfallInput(ImGui::WaterfallVFO* vfo) {
     if (!lockWaterfallControls && ImGui::GetTopMostPopupModal() == NULL) {
+        const auto replay = beige::iqreplay::state();
+        if (replay.replaying && replay.receiver == gui::waterfall.selectedVFO) {
+            const bool hovered = ImGui::IsMouseHoveringRect(gui::waterfall.fftAreaMin, gui::waterfall.fftAreaMax) ||
+                ImGui::IsMouseHoveringRect(gui::waterfall.wfMin, gui::waterfall.wfMax);
+            if (!vfo || !hovered) return;
+            double step = vfo->snapInterval;
+            if (ImGui::IsKeyDown(ImGuiKey_LeftShift)) step *= 10;
+            else if (ImGui::IsKeyDown(ImGuiKey_LeftAlt)) step *= .1;
+            int steps = ImGui::GetIO().MouseWheel;
+            if (!gui::freqSelect.digitHovered) {
+                if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow)) --steps;
+                if (ImGui::IsKeyPressed(ImGuiKey_RightArrow)) ++steps;
+            }
+            if (steps) beige::iqreplay::tune(std::round((replay.frequency + step * steps) / step) * step);
+            return;
+        }
         // Handle arrow keys
         if (vfo != NULL && (gui::waterfall.mouseInFFT || gui::waterfall.mouseInWaterfall)) {
             bool freqChanged = false;

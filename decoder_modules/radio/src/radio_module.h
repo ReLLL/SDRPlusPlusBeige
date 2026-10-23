@@ -437,7 +437,8 @@ public:
             const auto deempMode = deempModes[deempId];
             const double tau = deempAllowed && deempMode != DEEMP_MODE_NONE ? deempTaus[deempMode] : 0;
             iqReplay->update(selectedDemodID, bandwidth, audioSampleRate, highPass && highPassAllowed, tau, settings);
-        }, [this] { if (iqReplay) iqReplay->stop(); });
+        }, [this] { if (iqReplay) iqReplay->stop(); },
+        [this](double frequency) { return iqReplay && iqReplay->tune(frequency); });
         // Select the demodulator
         if (enabled) {
             if (!selectDemodByID((DemodID) selectedDemodID)) {

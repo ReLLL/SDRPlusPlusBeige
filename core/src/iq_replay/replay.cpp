@@ -15,7 +15,7 @@ namespace beige::iqreplay {
 namespace {
 std::mutex control;
 std::shared_ptr<Store> store;
-struct Radio { RadioUpdate update, stop; };
+struct Radio { RadioUpdate update, stop; RadioTune tune; };
 std::map<std::string, Radio> radios;
 State transport;
 std::string pendingNotice;
@@ -39,7 +39,7 @@ int64_t nowNs() {
 void initialize() {
     if (initialized) return;
     initialized = true;
-    feature = core::configManager.conf.value("waterfallReplay", false);
+    feature = core::configManager.conf.value("waterfallReplay", true);
     reconfigure = feature;
     using namespace httpdebug::procfs;
     registerEndpoint("/iq-replay/enabled", [] { return enabled() ? "true" : "false"; },
@@ -65,11 +65,15 @@ void initialize() {
                 seek(j.at("receiver"), {j.at("epoch"), j.at("sample"), b.rate, b.center, b.utcNs}, j.at("frequency"));
             } catch (const std::exception&) { notice("Invalid IQ replay point."); }
         }, Type::String);
+    registerEndpoint("/iq-replay/frequency", [] { return std::to_string(state().frequency); },
+        [](const std::string& value) {
+            try { tune(std::stod(value)); } catch (const std::exception&) { notice("Invalid replay frequency."); }
+        }, Type::Float);
 }
 }
 
-void registerRadio(const std::string& name, RadioUpdate update, RadioUpdate stop) {
-    initialize(); radios[name] = {std::move(update), std::move(stop)};
+void registerRadio(const std::string& name, RadioUpdate update, RadioUpdate stop, RadioTune tune) {
+    initialize(); radios[name] = {std::move(update), std::move(stop), std::move(tune)};
 }
 void removeRadio(const std::string& name) {
     if (state().receiver == name) live();
@@ -194,6 +198,18 @@ bool seek(const std::string& name, const Stamp& at, double frequency) {
         ++transport.revision; audibleKey = stream->second;
     }
     rewind::current(name); it->second.update(); return true;
+}
+bool tune(double frequency) {
+    const auto s = state();
+    const auto it = radios.find(s.receiver);
+    if (!s.replaying || it == radios.end()) return false;
+    if (!retainedPoint(s.storage, s.cursor, frequency) || !it->second.tune(frequency)) {
+        notice("That frequency or Radio filter is outside the retained IQ spectrum."); return false;
+    }
+    std::lock_guard<std::mutex> lock(control);
+    if (!transport.replaying || transport.revision != s.revision) return false;
+    transport.frequency = frequency;
+    return true;
 }
 size_t read(const std::string& name, uint64_t revision, dsp::complex_t* output, size_t count) {
     std::shared_ptr<Store> saved; Stamp at;

@@ -1,5 +1,15 @@
 # Beige validation
 
+## Replay frequency tuning and default (October 23, 1.3.44)
+
+Oz confirms that 1.3.43 double-click seeking and divider dragging work physically. He reports that replay cannot be retuned afterward. Build 1.3.44 adds frequency-only tuning through graph clicks/drags, the top frequency input, wheel and arrow keys. The golden IQ marker identifies historical listening. Double-click still chooses a new time/frequency; Live restores the live frequency display. New or missing preferences enable Waterfall replay by default, while a saved Off survives restart.
+
+All 29 CTests, plugin ABI comparison, package signatures, Python/Ruff and whitespace checks pass. The packaged five-module smoke measures 498.05 -> 1798.83 -> 498.05 Hz while replay moves between carriers at the same advancing timeline, with zero steady audio underruns. Its selected sample, revision and acquisition generation remain unchanged; the cursor advances rather than restarting. Thirty-two rapid retunes preserve the revision. Nonfinite, outside-band and filter-edge frequencies are rejected. Live RF center/VFO offset and persistent tuning flags remain unchanged; the header restores live frequency on Live.
+
+The full integration smoke also passes all eight Radio modes, exact time/frequency tone checks, independent audio rewind, live Recorder isolation at 500 Hz while listening to historical 1800 Hz, stopped tails, stale-generation rejection, disk failure auto-off/recovery and release on disable. Separate packaged launches verify a missing preference defaults on and an explicitly saved Off allocates no IQ storage. These are bounded audio/backend checks; native click/drag acceptance remains pending.
+
+Installed 1.3.44 preserves all 137 checked profile/plugin/resource files. Normal startup loads 39 instances, receives effective 800 kS/s RTL-SDR IQ, retains a 72.45-second buffer for the user's 1401-row waterfall and exits with code zero. One earlier build-path launch blocked in the existing PortAudio/CoreAudio device-format probe during Radio construction, before replay initialization; a clean process restart clears it. No audio routing or audio binary changed. All test instances are closed. Private logs and the installed-app backup receipt are under `/tmp/beige-iq-qa-20261023/`.
+
 ## Waterfall IQ replay (October 23, 1.3.43)
 
 The optional Radio checkbox defaults off. Double-clicking seeks the displayed time/frequency point; a first click reserves the gesture, while deliberate tuning drags and existing divider/bandwidth drags retain priority. Live in the waterfall context menu or audio strip exits IQ replay. Audio rewind cursors and exports remain independent. Retention follows visible rows and actual FFT sample intervals, with a bounded disk queue, safety margin and resize hysteresis. See [IQ-REPLAY.md](IQ-REPLAY.md).

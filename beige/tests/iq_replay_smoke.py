@@ -120,6 +120,36 @@ def main():
     assert status()['head'] == head
     results['replay'] = performance(2)
 
+    # Frequency-only tuning must preserve the timeline and live VFO while the
+    # listening decoder changes carriers. No repeated decoder construction.
+    seek(2560000, 7120000)
+    results['retuning'] = [tone(500)]
+    before = status()
+    live_before = json.loads(req('/proc/display/ham-band-state'))
+    for frequency, expected in [(7080000, 1800), (7120000, 500)]:
+        req('/proc/iq-replay/frequency', str(frequency))
+        after = status()
+        assert after['frequency'] == frequency and after['revision'] == before['revision']
+        assert after['selected_sample'] == before['selected_sample'] and after['epoch'] == before['epoch']
+        assert before['cursor'] <= after['cursor'] < before['cursor'] + 800000 * 2
+        results['retuning'].append(tone(expected))
+        before = status()
+    for frequency in ['nan', 'inf', '7500000', '6700000', '7499999']:
+        req('/proc/iq-replay/frequency', frequency)
+        assert status()['frequency'] == 7120000 and status()['replaying']
+    for i in range(32):
+        req('/proc/iq-replay/frequency', str(7080000 if i % 2 == 0 else 7120000))
+        assert status()['revision'] == before['revision']
+    live_after = json.loads(req('/proc/display/ham-band-state'))
+    for key in ['spectrum_center', 'vfo_offset', 'center_tuning', 'single_click_vfo']:
+        assert live_before[key] == live_after[key], (key, live_before, live_after)
+    assert live_after['frequency'] == 7120000, live_after
+    req('/proc/audio-rewind/live', 'true')
+    time.sleep(.1)
+    restored = json.loads(req('/proc/display/ham-band-state'))
+    assert restored['frequency'] == restored['spectrum_center'] + restored['vfo_offset'], restored
+    seek(800000, 7080000)
+
     # Rewind controls own their cursor; only the shared Live action exits IQ.
     revision = status()['revision']
     req('/proc/audio-rewind/seek', '3')

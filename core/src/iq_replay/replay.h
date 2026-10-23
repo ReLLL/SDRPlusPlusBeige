@@ -13,7 +13,8 @@ struct State {
     uint64_t rendered = 0, underruns = 0, queuedAudio = 0;
 };
 using RadioUpdate = std::function<void()>;
-void registerRadio(const std::string& name, RadioUpdate update, RadioUpdate stop);
+using RadioTune = std::function<bool(double)>;
+void registerRadio(const std::string& name, RadioUpdate update, RadioUpdate stop, RadioTune tune);
 void removeRadio(const std::string& name);
 bool enabled();
 void enable(bool value);
@@ -27,6 +28,7 @@ void notice(const std::string& text);
 void fault(const std::string& text);
 std::string takeNotice();
 bool seek(const std::string& receiver, const Stamp& at, double frequency);
+bool tune(double frequency);
 void live();
 size_t read(const std::string& receiver, uint64_t revision, dsp::complex_t* output, size_t count);
 void audio(const std::string& receiver, uint64_t revision, const dsp::stereo_t* data, size_t count, int rate);

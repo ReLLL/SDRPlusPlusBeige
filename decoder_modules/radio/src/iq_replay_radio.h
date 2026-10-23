@@ -18,11 +18,12 @@ public:
     explicit IQReplayRadio(std::string name) : name(std::move(name)) {}
     ~IQReplayRadio() { stop(); }
     void stop() { pipeline.reset(); signature.clear(); }
+    bool tune(double frequency) { return pipeline && pipeline->tune(frequency); }
     void update(int mode, double bandwidth, double audioRate, bool highPass, double tau, const json& settings) {
         const auto s = beige::iqreplay::state();
         if (!s.replaying || s.receiver != name) { stop(); return; }
         const auto next = json::array({mode, bandwidth, audioRate, highPass, tau, settings,
-            s.revision, s.cursor.rate, s.frequency, s.cursor.center}).dump();
+            s.revision, s.cursor.rate, s.cursor.center}).dump();
         if (next == signature) return;
         stop();
         try {
@@ -49,8 +50,19 @@ private:
         dsp::tap<float> taps{};
         dsp::sink::Handler<dsp::stereo_t> sink;
         std::atomic<bool> stopping{false};
+        std::atomic<double> requestedOffset{0};
+        double capturedCenter = 0, capturedRate = 0, filterBandwidth = 0;
+        int reference = 0;
         std::thread feeder;
         bool started = false;
+        bool tune(double frequency) {
+            double offset = frequency - capturedCenter;
+            if (reference == ImGui::WaterfallVFO::REF_LOWER) offset += filterBandwidth / 2;
+            if (reference == ImGui::WaterfallVFO::REF_UPPER) offset -= filterBandwidth / 2;
+            if (!std::isfinite(offset) || std::abs(offset) + filterBandwidth / 2 > capturedRate / 2) return false;
+            requestedOffset = offset;
+            return true;
+        }
 
         static std::unique_ptr<demod::Demodulator> makeDemod(int mode) {
             switch (mode) {
@@ -80,12 +92,12 @@ private:
             demod->AFSampRateChanged(audioRate);
             if (mode == RADIO_IFACE_MODE_WFM) static_cast<demod::WFM*>(demod.get())->listeningOnly();
             const double ifRate = demod->getIFSampleRate();
-            double offset = s.frequency - s.cursor.center;
-            if (demod->getVFOReference() == ImGui::WaterfallVFO::REF_LOWER) offset += bandwidth / 2;
-            if (demod->getVFOReference() == ImGui::WaterfallVFO::REF_UPPER) offset -= bandwidth / 2;
-            if (std::abs(offset) + bandwidth / 2 > s.cursor.rate / 2)
+            capturedCenter = s.cursor.center; capturedRate = s.cursor.rate;
+            filterBandwidth = bandwidth; reference = demod->getVFOReference();
+            if (!tune(s.frequency))
                 throw std::invalid_argument("The Radio filter extends outside the recorded spectrum. Narrow its bandwidth or select another point.");
-            vfo = std::make_unique<dsp::channel::RxVFO>(&unused, s.cursor.rate, ifRate, bandwidth, offset);
+            const double initialOffset = requestedOffset;
+            vfo = std::make_unique<dsp::channel::RxVFO>(&unused, s.cursor.rate, ifRate, bandwidth, initialOffset);
             chain.init(demod->getOutput());
             resampler.init(nullptr, demod->getAFSampleRate(), audioRate);
             chain.addBlock(&resampler, demod->getPostProcEnabled());
@@ -101,13 +113,16 @@ private:
             try {
             started = true;
             sink.start(); chain.start(); demod->start();
-            feeder = std::thread([this, rate = s.cursor.rate] {
+            feeder = std::thread([this, rate = s.cursor.rate, initialOffset] {
                 try {
                     std::vector<dsp::complex_t> input(size_t(std::clamp(rate / 100, 1.0, 32768.0)));
                     auto next = std::chrono::steady_clock::now();
+                    double offset = initialOffset;
                     while (!stopping) {
                         const size_t count = beige::iqreplay::read(name, revision, input.data(), input.size());
                         if (!count) { std::this_thread::sleep_for(std::chrono::milliseconds(2)); continue; }
+                        const double requested = requestedOffset;
+                        if (requested != offset) { vfo->setOffset(requested); offset = requested; }
                         const int produced = vfo->process(int(count), input.data(), channel.writeBuf);
                         if (produced && !channel.swap(produced)) break;
                         next += std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<double>(count / rate));

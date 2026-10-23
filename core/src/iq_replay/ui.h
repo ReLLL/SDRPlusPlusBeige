@@ -6,7 +6,9 @@ namespace beige::iqreplay {
 void resizeRows(void* owner, int oldHead, int oldHeight, int height);
 void clearRows(void* owner);
 void pushRow(void* owner, int index, int height);
-bool handleInput(void* owner, ImVec2 min, ImVec2 max, const std::string& receiver);
+bool handleInput(void* owner, ImVec2 min, ImVec2 max, ImVec2 spectrumMin, ImVec2 spectrumMax,
+    double low, double high, double snap, const std::string& receiver);
+void drawMarker(ImDrawList* draw, ImVec2 min, ImVec2 max, double low, double high);
 void drawMap(void* owner, ImDrawList* draw, ImVec2 min, ImVec2 max, int head, int filled,
     int height, double low, double high);
 void drawSetting();
